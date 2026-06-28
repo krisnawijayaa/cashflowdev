@@ -1080,6 +1080,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <script>
 // ─── STATE ─────────────────────────────────────────────────────────────────
+const API_URL = "https://script.google.com/macros/s/AKfycbzPXq10lIMKIAfvnSPIVaReToigiPry3eXD0DPzr2V5a5KdS6nLoJMQ1IS9k5mtlQzC/exec";
 let transactions = [];
 let settings = {income:0,name:'BNI Main Account',cclimit:5000000};
 let splitPeople = [];
@@ -1089,8 +1090,37 @@ let settleContext = null; // {type:'piutang'|'mydebt', txId, personIdx or debtId
 let currentDebtTab = 'piutang';
 
 // Load from localStorage safely
-try { transactions = JSON.parse(localStorage.getItem('cf_txs') || '[]'); } catch(e) { transactions = []; }
-try { settings = Object.assign({income:0,name:'BNI Main Account',cclimit:5000000}, JSON.parse(localStorage.getItem('cf_settings') || '{}')); } catch(e) {}
+async function loadDatabase(){
+
+    try{
+
+        const res = await fetch(API_URL);
+
+        const db = await res.json();
+
+        transactions = db.transaksi || [];
+
+        if(db.settings && db.settings.length){
+
+            settings = {
+                income:Number(db.settings.find(x=>x.key=="income")?.value||0),
+                name:db.settings.find(x=>x.key=="account")?.value||"BNI Main Account",
+                cclimit:Number(db.settings.find(x=>x.key=="cclimit")?.value||5000000)
+            };
+
+        }
+
+        console.log("Database Loaded",db);
+
+    }catch(err){
+
+        console.error(err);
+
+        alert("Gagal mengambil data dari Spreadsheet");
+
+    }
+
+}
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const fmt = n => 'Rp ' + Math.abs(Math.round(n)).toLocaleString('id-ID');
@@ -3301,16 +3331,48 @@ function escHtml(s){
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', ()=>{
-  const fd=el('f-date'); if(fd) fd.value=todayStr();
-  const ud=el('ud-date'); if(ud) ud.value=todayStr();
-  const rm=el('report-month'); if(rm) rm.value=todayStr().slice(0,7);
-  // close modals on overlay click
-  ['edit-tx-modal','edit-piutang-modal','edit-mydebt-modal','settings-modal','settle-modal','asset-modal'].forEach(id=>{
-    const overlay=el(id);
-    if(overlay) overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.classList.remove('open'); });
+window.addEventListener('DOMContentLoaded', async ()=>{
+
+  const fd=el('f-date');
+  if(fd) fd.value=todayStr();
+
+  const ud=el('ud-date');
+  if(ud) ud.value=todayStr();
+
+  const rm=el('report-month');
+  if(rm) rm.value=todayStr().slice(0,7);
+
+  [
+    'edit-tx-modal',
+    'edit-piutang-modal',
+    'edit-mydebt-modal',
+    'settings-modal',
+    'settle-modal',
+    'asset-modal'
+  ].forEach(id=>{
+      const overlay=el(id);
+      if(overlay){
+          overlay.addEventListener('click',e=>{
+              if(e.target===overlay){
+                  overlay.classList.remove('open');
+              }
+          });
+      }
   });
+
+  // ==========================
+  // LOAD DATABASE
+  // ==========================
+  await loadDatabase();
+
+  // ==========================
+  // RENDER
+  // ==========================
   renderDashboard();
+  renderTransaksi();
+  renderUtang();
+  renderAset();
+
 });
 </script>
 </body>
