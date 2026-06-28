@@ -1142,7 +1142,45 @@ function showToast(msg){
   const t=el('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2400);
 }
-function save(){ localStorage.setItem('cf_txs',JSON.stringify(transactions)); }
+function save() {
+    localStorage.setItem('cf_txs', JSON.stringify(transactions));
+}
+
+async function syncTransaction(tx) {
+
+    const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            action: "saveTransaction",
+
+            id: tx.id,
+            tanggal: tx.date,
+            deskripsi: tx.desc,
+            kategori: tx.cat,
+            sumber: tx.src,
+            nominal: tx.amount,
+            bagianGua: tx.myShare,
+            catatan: tx.note,
+            split: tx.split,
+            myDebt: tx.myDebt
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error("HTTP Error " + response.status);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+        throw new Error(result.message || "Gagal menyimpan");
+    }
+
+    return result;
+}
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
 function showPage(id, btn){
@@ -1236,7 +1274,8 @@ function toggleMyDebt(){
 }
 
 // ─── SAVE TRANSACTION ────────────────────────────────────────────────────────
-function saveTransaction(){
+async function saveTransaction(){
+
   const date = el('f-date').value;
   const amount = parseShorthand(el('f-amount').value);
   const desc = el('f-desc').value.trim();
@@ -1244,10 +1283,13 @@ function saveTransaction(){
   const src = el('f-src').value;
   const note = el('f-note').value.trim();
 
-  if(!date||!amount||!desc){ showToast('⚠️ Tanggal, nominal, dan deskripsi wajib!'); return; }
+  if(!date || !amount || !desc){
+      showToast('⚠️ Tanggal, nominal, dan deskripsi wajib!');
+      return;
+  }
 
   const hasSplit = el('split-toggle').checked && splitPeople.length>0;
-  const activeSplit = splitPeople.filter(p=>p.name&&p.amount>0);
+  const activeSplit = splitPeople.filter(p=>p.name && p.amount>0);
   const othersTotal = activeSplit.reduce((s,p)=>s+p.amount,0);
   const myShare = hasSplit && activeSplit.length>0 ? amount-othersTotal : amount;
 
@@ -1257,33 +1299,62 @@ function saveTransaction(){
   const mdNote = el('md-note').value.trim();
 
   const tx = {
-    id: Date.now(),
-    date, amount, desc, cat, src, note,
-    myShare,
-    split: hasSplit && activeSplit.length>0 ? activeSplit.map(p=>({name:p.name,amount:p.amount,settled:false,settleMethod:'',settleNote:'',settleDate:''})) : null,
-    myDebt: hasMyDebt && mdName && mdAmount>0 ? {to:mdName,amount:mdAmount,note:mdNote,settled:false,settleMethod:'',settleNote:'',settleDate:''} : null
+      id: Date.now(),
+      date,
+      amount,
+      desc,
+      cat,
+      src,
+      note,
+      myShare,
+      split: hasSplit && activeSplit.length>0
+          ? activeSplit.map(p=>({
+              name:p.name,
+              amount:p.amount,
+              settled:false,
+              settleMethod:'',
+              settleNote:'',
+              settleDate:''
+          }))
+          : null,
+      myDebt: hasMyDebt && mdName && mdAmount>0
+          ? {
+              to:mdName,
+              amount:mdAmount,
+              note:mdNote,
+              settled:false,
+              settleMethod:'',
+              settleNote:'',
+              settleDate:''
+          }
+          : null
   };
 
-  transactions.unshift(tx);
-  save();
-  showToast('✅ Transaksi tersimpan!');
-  resetForm();
-}
+  try{
 
-function resetForm(){
-  el('f-date').value=todayStr();
-  ['f-amount','f-desc','f-note'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
-  el('f-cat').value='food'; el('f-src').value='bni';
-  resetSplit();
-}
+      // kirim ke Spreadsheet
+      await syncTransaction(tx);
 
-function deleteTransaction(id){
-  if(!confirm('Hapus transaksi ini?')) return;
-  transactions=transactions.filter(t=>t.id!==id);
-  save(); renderTransaksi(); renderDashboard();
-  showToast('🗑️ Transaksi dihapus');
-}
+      // backup local
+      transactions.unshift(tx);
+      save();
 
+      renderDashboard();
+      renderTransaksi();
+
+      showToast("✅ Transaksi berhasil disimpan");
+
+      resetForm();
+
+  }catch(err){
+
+      console.error(err);
+
+      showToast("❌ Gagal menyimpan");
+
+  }
+
+}
 // ─── SETTLE MODAL ────────────────────────────────────────────────────────────
 function openSettleModal(type, txId, idx, currentSettled){
   const tx = transactions.find(t=>t.id===txId);
