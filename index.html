@@ -320,7 +320,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <button class="nav-item" onclick="openSettings()"><span class="icon">⚙️</span> Pengaturan</button>
     <button class="nav-item" onclick="confirmReset()" style="color:var(--red)"><span class="icon">🗑️</span> Reset Data</button>
   </div>
-  <div class="sidebar-footer">BNI Main Account<br/>Cashflow v3.0</div>
+  <div class="sidebar-footer">
+    <div id="sync-status" style="margin-bottom:8px">⏳ <span style="font-size:11px">Memuat...</span></div>
+    <button onclick="loadFromGist()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:6px;margin-bottom:4px" title="Sync ulang dari cloud">🔄 Sync</button>
+    <div>Cashflow v3.0</div>
+  </div>
 </aside>
 
 <nav class="mobile-nav">
@@ -1079,48 +1083,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── STATE ─────────────────────────────────────────────────────────────────
-const API_URL = "https://script.google.com/macros/s/AKfycbzPXq10lIMKIAfvnSPIVaReToigiPry3eXD0DPzr2V5a5KdS6nLoJMQ1IS9k5mtlQzC/exec";
+// ─── GIST SYNC CONFIG ────────────────────────────────────────────
+const GIST_ID   = '97c86a2d3e2109d850239213cff908f6';
+const GIST_OWNER= 'krisnawijayaa';
+const GIST_FILE = 'cashflow_data.json';
+let   GIST_TOKEN = localStorage.getItem('cf_gist_token') || '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';
+let   _syncTimer  = null;
+let   _lastSyncedHash = '';
+let   _syncPending = false;
+
+// ─── STATE ───────────────────────────────────────────────────────────────────────────
 let transactions = [];
-let settings = {income:0,name:'BNI Main Account',cclimit:5000000};
-let splitPeople = [];
+let assets       = [];
+let settings     = {income:0,name:'BNI Main Account',cclimit:5000000};
+let splitPeople  = [];
 let currentFilter = 'all';
 let trendChart = null, pieChart = null;
-let settleContext = null; // {type:'piutang'|'mydebt', txId, personIdx or debtIdx}
+let settleContext = null;
 let currentDebtTab = 'piutang';
 
-// Load from localStorage safely
-async function loadDatabase(){
-
-    try{
-
-        const res = await fetch(API_URL);
-
-        const db = await res.json();
-
-        transactions = db.transaksi || [];
-
-        if(db.settings && db.settings.length){
-
-            settings = {
-                income:Number(db.settings.find(x=>x.key=="income")?.value||0),
-                name:db.settings.find(x=>x.key=="account")?.value||"BNI Main Account",
-                cclimit:Number(db.settings.find(x=>x.key=="cclimit")?.value||5000000)
-            };
-
-        }
-
-        console.log("Database Loaded",db);
-
-    }catch(err){
-
-        console.error(err);
-
-        alert("Gagal mengambil data dari Spreadsheet");
-
-    }
-
-}
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const fmt = n => 'Rp ' + Math.abs(Math.round(n)).toLocaleString('id-ID');
@@ -1142,35 +1123,9 @@ function showToast(msg){
   const t=el('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2400);
 }
-function save() {
-    localStorage.setItem('cf_txs', JSON.stringify(transactions));
-}
-
-async function syncTransaction(tx){
-
-    const formData = new FormData();
-
-    formData.append("data", JSON.stringify({
-        action:"saveTransaction",
-        id:tx.id,
-        tanggal:tx.date,
-        deskripsi:tx.desc,
-        kategori:tx.cat,
-        sumber:tx.src,
-        nominal:tx.amount,
-        bagianGua:tx.myShare,
-        catatan:tx.note,
-        split:tx.split,
-        myDebt:tx.myDebt
-    }));
-
-    const response = await fetch(API_URL,{
-        method:"POST",
-        body:formData
-    });
-
-    return await response.json();
-
+function save(){
+  localStorage.setItem('cf_txs',JSON.stringify(transactions));
+  scheduleSyncToGist();
 }
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -1265,8 +1220,7 @@ function toggleMyDebt(){
 }
 
 // ─── SAVE TRANSACTION ────────────────────────────────────────────────────────
-async function saveTransaction(){
-
+function saveTransaction(){
   const date = el('f-date').value;
   const amount = parseShorthand(el('f-amount').value);
   const desc = el('f-desc').value.trim();
@@ -1274,13 +1228,10 @@ async function saveTransaction(){
   const src = el('f-src').value;
   const note = el('f-note').value.trim();
 
-  if(!date || !amount || !desc){
-      showToast('⚠️ Tanggal, nominal, dan deskripsi wajib!');
-      return;
-  }
+  if(!date||!amount||!desc){ showToast('⚠️ Tanggal, nominal, dan deskripsi wajib!'); return; }
 
   const hasSplit = el('split-toggle').checked && splitPeople.length>0;
-  const activeSplit = splitPeople.filter(p=>p.name && p.amount>0);
+  const activeSplit = splitPeople.filter(p=>p.name&&p.amount>0);
   const othersTotal = activeSplit.reduce((s,p)=>s+p.amount,0);
   const myShare = hasSplit && activeSplit.length>0 ? amount-othersTotal : amount;
 
@@ -1290,62 +1241,33 @@ async function saveTransaction(){
   const mdNote = el('md-note').value.trim();
 
   const tx = {
-      id: Date.now(),
-      date,
-      amount,
-      desc,
-      cat,
-      src,
-      note,
-      myShare,
-      split: hasSplit && activeSplit.length>0
-          ? activeSplit.map(p=>({
-              name:p.name,
-              amount:p.amount,
-              settled:false,
-              settleMethod:'',
-              settleNote:'',
-              settleDate:''
-          }))
-          : null,
-      myDebt: hasMyDebt && mdName && mdAmount>0
-          ? {
-              to:mdName,
-              amount:mdAmount,
-              note:mdNote,
-              settled:false,
-              settleMethod:'',
-              settleNote:'',
-              settleDate:''
-          }
-          : null
+    id: Date.now(),
+    date, amount, desc, cat, src, note,
+    myShare,
+    split: hasSplit && activeSplit.length>0 ? activeSplit.map(p=>({name:p.name,amount:p.amount,settled:false,settleMethod:'',settleNote:'',settleDate:''})) : null,
+    myDebt: hasMyDebt && mdName && mdAmount>0 ? {to:mdName,amount:mdAmount,note:mdNote,settled:false,settleMethod:'',settleNote:'',settleDate:''} : null
   };
 
-  try{
-
-      // kirim ke Spreadsheet
-      await syncTransaction(tx);
-
-      // backup local
-      transactions.unshift(tx);
-      save();
-
-      renderDashboard();
-      renderTransaksi();
-
-      showToast("✅ Transaksi berhasil disimpan");
-
-      resetForm();
-
-  }catch(err){
-
-      console.error(err);
-
-      showToast("❌ Gagal menyimpan");
-
-  }
-
+  transactions.unshift(tx);
+  save();
+  showToast('✅ Transaksi tersimpan!');
+  resetForm();
 }
+
+function resetForm(){
+  el('f-date').value=todayStr();
+  ['f-amount','f-desc','f-note'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
+  el('f-cat').value='food'; el('f-src').value='bni';
+  resetSplit();
+}
+
+function deleteTransaction(id){
+  if(!confirm('Hapus transaksi ini?')) return;
+  transactions=transactions.filter(t=>t.id!==id);
+  save(); renderTransaksi(); renderDashboard();
+  showToast('🗑️ Transaksi dihapus');
+}
+
 // ─── SETTLE MODAL ────────────────────────────────────────────────────────────
 function openSettleModal(type, txId, idx, currentSettled){
   const tx = transactions.find(t=>t.id===txId);
@@ -2366,12 +2288,17 @@ function saveSettings(){
   settings.name=el('set-name').value||'BNI Main Account';
   settings.cclimit=parseFloat(el('set-cclimit').value)||5000000;
   localStorage.setItem('cf_settings',JSON.stringify(settings));
+  scheduleSyncToGist();
   closeSettings(); renderDashboard();
   showToast('✅ Pengaturan disimpan!');
 }
 
 function confirmReset(){
-  if(confirm('Reset semua data (transaksi & aset)? Tidak bisa di-undo.')){ transactions=[]; assets=[]; save(); saveAssets(); renderDashboard(); showToast('🗑️ Data direset'); }
+  if(confirm('Reset semua data? Tidak bisa di-undo.')){
+    transactions=[]; assets=[];
+    localStorage.removeItem('cf_txs'); localStorage.removeItem('cf_assets');
+    syncToGist(true).then(()=>{ renderDashboard(); showToast('🗑️ Data direset'); });
+  }
 }
 
 // ─── EDIT TRANSAKSI ──────────────────────────────────────────────────────────
@@ -2572,10 +2499,7 @@ function showPageFromSheet(id){
 }
 
 // ─── ASSETS & NET WORTH ──────────────────────────────────────────────────────
-let assets = [];
-try { assets = JSON.parse(localStorage.getItem('cf_assets') || '[]'); } catch(e) { assets = []; }
-
-function saveAssets(){ localStorage.setItem('cf_assets', JSON.stringify(assets)); }
+function saveAssets(){ scheduleSyncToGist(); }
 
 // Depreciation rates per tahun (negatif = susut, positif = apresiasi)
 const DEPR_RATES = {
@@ -3387,54 +3311,101 @@ function buildReportElement(d){
   return wrap;
 }
 
+
+// ─── GIST SYNC ENGINE ────────────────────────────────────────────────────────
+function showSyncStatus(state, msg){
+  const statusEl = el('sync-status');
+  if(!statusEl) return;
+  const icons  = {syncing:'⏳',ok:'☁️',error:'⚠️',offline:'📴'};
+  const colors = {syncing:'var(--text-muted)',ok:'var(--green)',error:'var(--amber)',offline:'var(--text-muted)'};
+  statusEl.innerHTML = '<span style="color:'+colors[state]+';font-size:11px;font-weight:600">'+icons[state]+' '+msg+'</span>';
+}
+
+async function loadFromGist(){
+  showSyncStatus('syncing','Memuat...');
+  try {
+    const raw = 'https://gist.githubusercontent.com/'+GIST_OWNER+'/'+GIST_ID+'/raw/'+GIST_FILE+'?_='+Date.now();
+    const r = await fetch(raw);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    if(data.transactions) transactions = data.transactions;
+    if(data.assets)       assets       = data.assets;
+    if(data.settings)     settings     = Object.assign({income:0,name:'BNI Main Account',cclimit:5000000}, data.settings);
+    localStorage.setItem('cf_txs',      JSON.stringify(transactions));
+    localStorage.setItem('cf_assets',   JSON.stringify(assets));
+    localStorage.setItem('cf_settings', JSON.stringify(settings));
+    _lastSyncedHash = JSON.stringify({transactions,assets,settings});
+    showSyncStatus('ok','Tersinkron');
+  } catch(e) {
+    console.warn('Gist load failed, using cache:', e);
+    try { transactions = JSON.parse(localStorage.getItem('cf_txs')  || '[]'); } catch(_){}
+    try { assets       = JSON.parse(localStorage.getItem('cf_assets')|| '[]'); } catch(_){}
+    try { settings = Object.assign({income:0,name:'BNI Main Account',cclimit:5000000}, JSON.parse(localStorage.getItem('cf_settings')||'{}')); } catch(_){}
+    showSyncStatus('offline','Offline — pakai cache');
+  }
+  const fd=el('f-date'); if(fd&&!fd.value) fd.value=todayStr();
+  const ud=el('ud-date'); if(ud&&!ud.value) ud.value=todayStr();
+  const rm=el('report-month'); if(rm&&!rm.value) rm.value=todayStr().slice(0,7);
+  renderDashboard();
+}
+
+async function syncToGist(force){
+  if(!GIST_TOKEN){ showSyncStatus('offline','Token belum diset'); return; }
+  const currentHash = JSON.stringify({transactions,assets,settings});
+  if(!force && currentHash===_lastSyncedHash) return;
+  showSyncStatus('syncing','Menyimpan...');
+  try {
+    const data = {transactions,assets,settings,version:1,updatedAt:new Date().toISOString()};
+    const r = await fetch('https://api.github.com/gists/'+GIST_ID, {
+      method:'PATCH',
+      headers:{'Authorization':'token '+GIST_TOKEN,'Content-Type':'application/json'},
+      body: JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(data)}}})
+    });
+    if(!r.ok){ const err=await r.json(); throw new Error(err.message||'HTTP '+r.status); }
+    _lastSyncedHash = currentHash;
+    _syncPending = false;
+    showSyncStatus('ok','Tersimpan ☁️');
+  } catch(e) {
+    console.error('Sync error:',e);
+    _syncPending = true;
+    showSyncStatus('error','Gagal sync');
+  }
+}
+
+function scheduleSyncToGist(){
+  localStorage.setItem('cf_txs',JSON.stringify(transactions));
+  localStorage.setItem('cf_assets',JSON.stringify(assets));
+  clearTimeout(_syncTimer);
+  showSyncStatus('syncing','...');
+  _syncTimer = setTimeout(()=>syncToGist(false), 1500);
+}
+
+// Re-sync saat tab kembali aktif
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    if(_syncPending) syncToGist(false);
+    else loadFromGist();
+  }
+});
+
+// Safety net sync tiap 5 menit
+setInterval(()=>syncToGist(false), 5*60*1000);
+
 // ─── HELPER ───────────────────────────────────────────────────────────────────
 function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', async ()=>{
-
-  const fd=el('f-date');
-  if(fd) fd.value=todayStr();
-
-  const ud=el('ud-date');
-  if(ud) ud.value=todayStr();
-
-  const rm=el('report-month');
-  if(rm) rm.value=todayStr().slice(0,7);
-
-  [
-    'edit-tx-modal',
-    'edit-piutang-modal',
-    'edit-mydebt-modal',
-    'settings-modal',
-    'settle-modal',
-    'asset-modal'
-  ].forEach(id=>{
-      const overlay=el(id);
-      if(overlay){
-          overlay.addEventListener('click',e=>{
-              if(e.target===overlay){
-                  overlay.classList.remove('open');
-              }
-          });
-      }
+window.addEventListener('DOMContentLoaded', ()=>{
+  const fd=el('f-date'); if(fd) fd.value=todayStr();
+  const ud=el('ud-date'); if(ud) ud.value=todayStr();
+  const rm=el('report-month'); if(rm) rm.value=todayStr().slice(0,7);
+  ['edit-tx-modal','edit-piutang-modal','edit-mydebt-modal','settings-modal','settle-modal','asset-modal'].forEach(id=>{
+    const overlay=el(id);
+    if(overlay) overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.classList.remove('open'); });
   });
-
-  // ==========================
-  // LOAD DATABASE
-  // ==========================
-  await loadDatabase();
-
-  // ==========================
-  // RENDER
-  // ==========================
-  renderDashboard();
-  renderTransaksi();
-  renderUtang();
-  renderAset();
-
+  loadFromGist();
 });
 </script>
 </body>
