@@ -1146,40 +1146,31 @@ function save() {
     localStorage.setItem('cf_txs', JSON.stringify(transactions));
 }
 
-async function syncTransaction(tx) {
+async function syncTransaction(tx){
 
-    const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            action: "saveTransaction",
+    const formData = new FormData();
 
-            id: tx.id,
-            tanggal: tx.date,
-            deskripsi: tx.desc,
-            kategori: tx.cat,
-            sumber: tx.src,
-            nominal: tx.amount,
-            bagianGua: tx.myShare,
-            catatan: tx.note,
-            split: tx.split,
-            myDebt: tx.myDebt
-        })
+    formData.append("data", JSON.stringify({
+        action:"saveTransaction",
+        id:tx.id,
+        tanggal:tx.date,
+        deskripsi:tx.desc,
+        kategori:tx.cat,
+        sumber:tx.src,
+        nominal:tx.amount,
+        bagianGua:tx.myShare,
+        catatan:tx.note,
+        split:tx.split,
+        myDebt:tx.myDebt
+    }));
+
+    const response = await fetch(API_URL,{
+        method:"POST",
+        body:formData
     });
 
-    if (!response.ok) {
-        throw new Error("HTTP Error " + response.status);
-    }
+    return await response.json();
 
-    const result = await response.json();
-
-    if (!result.success) {
-        throw new Error(result.message || "Gagal menyimpan");
-    }
-
-    return result;
 }
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
