@@ -1,0 +1,799 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Cashflow — Personal Finance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><span>💰</span> Cashflow</div>
+  <button class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span> Dashboard</button>
+  <button class="nav-item" onclick="showPage('transaksi',this)"><span class="icon">📋</span> Transaksi</button>
+  <button class="nav-item" onclick="showPage('tambah',this)"><span class="icon">➕</span> Tambah</button>
+  <button class="nav-item" onclick="showPage('tabungan',this)"><span class="icon">🏦</span> Tabungan</button>
+  <button class="nav-item" onclick="showPage('aset',this)"><span class="icon">💎</span> Aset & Kekayaan</button>
+  <button class="nav-item" onclick="showPage('kredit',this)"><span class="icon">💳</span> Kredit Card</button>
+  <button class="nav-item" onclick="showPage('utang',this)"><span class="icon">🤝</span> Piutang & Utang</button>
+  <button class="nav-item" onclick="showPage('tambahutang',this)"><span class="icon">🏧</span> Catat Utang Gua</button>
+  <button class="nav-item" onclick="showPage('importexport',this)"><span class="icon">📂</span> Import / Export</button>
+  <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+    <button class="nav-item" onclick="openSettings()"><span class="icon">⚙️</span> Pengaturan</button>
+    <button class="nav-item" onclick="confirmReset()" style="color:var(--red)"><span class="icon">🗑️</span> Reset Data</button>
+  </div>
+  <div class="sidebar-footer">BNI Main Account<br/>Cashflow v3.0</div>
+</aside>
+
+<nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mob-nav-btn active" onclick="showPage('dashboard',this)" data-mob="dashboard"><span class="icon">📊</span>Home</button>
+    <button class="mob-nav-btn" onclick="showPage('tambah',this)" data-mob="tambah"><span class="icon">➕</span>Tambah</button>
+    <button class="mob-nav-btn" onclick="showPage('tambahutang',this)" data-mob="tambahutang"><span class="icon">🏧</span>Utang Gua</button>
+    <button class="mob-nav-btn" onclick="showPage('utang',this)" data-mob="utang"><span class="icon">🤝</span>Piutang</button>
+    <button class="mob-nav-btn" id="mob-more-btn" onclick="toggleMoreSheet()"><span class="icon">☰</span>Lainnya</button>
+  </div>
+</nav>
+
+<!-- MOBILE MORE SHEET -->
+<div id="more-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.5)" onclick="closeMoreSheet()"></div>
+<div id="more-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:151;background:var(--surface);border-top:1px solid var(--border);border-radius:20px 20px 0 0;padding:16px 16px 32px;transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
+  <div style="width:36px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 20px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="more-sheet-btn" onclick="showPageFromSheet('transaksi')"><span>📋</span> Transaksi</button>
+    <button class="more-sheet-btn" onclick="showPageFromSheet('importexport')"><span>📂</span> Import / Export</button>
+    <button class="more-sheet-btn" onclick="showPageFromSheet('kredit')"><span>💳</span> Kredit Card</button>
+    <button class="more-sheet-btn" onclick="showPageFromSheet('tabungan')"><span>🏦</span> Tabungan</button>
+    <button class="more-sheet-btn" onclick="showPageFromSheet('aset')"><span>💎</span> Aset & Kekayaan</button>
+    <button class="more-sheet-btn" onclick="closeMoreSheet();openSettings()"><span>⚙️</span> Pengaturan</button>
+    <button class="more-sheet-btn" onclick="showPageFromSheet('importexport')"><span>📥</span> Import Data</button>
+  </div>
+</div>
+
+<main class="main">
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="topbar">
+    <div><h1>Dashboard</h1><div class="date-label" id="today-label">—</div></div>
+    <button class="btn btn-primary" onclick="showPage('tambah',null)">➕ Tambah Transaksi</button>
+  </div>
+  <div class="grid-4">
+    <div class="card card-accent-blue"><div class="card-label">Hari Ini</div><div class="card-value" id="dash-today">Rp 0</div><div class="card-sub">pengeluaran harian</div></div>
+    <div class="card card-accent-amber"><div class="card-label">Minggu Ini</div><div class="card-value" id="dash-week">Rp 0</div><div class="card-sub">7 hari terakhir</div></div>
+    <div class="card card-accent-red"><div class="card-label">Bulan Ini</div><div class="card-value" id="dash-month">Rp 0</div><div class="card-sub">pengeluaran bulan ini</div></div>
+    <div class="card card-accent-teal"><div class="card-label">Piutang Aktif</div><div class="card-value" id="dash-piutang">Rp 0</div><div class="card-sub" id="dash-piutang-sub">0 orang belum bayar</div></div>
+  </div>
+  <div class="grid-main">
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="section-title">Tren 30 Hari Terakhir</div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="section-title">Breakdown Kategori <span id="cat-month-label" style="color:var(--text-muted);font-size:11px;font-weight:400"></span></div>
+        <div id="cat-bars"></div>
+        <div style="height:180px;margin-top:12px"><canvas id="pieChart"></canvas></div>
+      </div>
+      <div class="insight-box">
+        <h3>⚡ Insight Bulan Ini</h3>
+        <div id="insight-list"><div class="insight-item"><span class="dot dot-blue"></span><span>Belum ada data. Mulai tambahkan transaksi!</span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-label">💳 Credit Card Bulan Ini</div>
+        <div class="card-value" style="color:var(--amber)" id="dash-cc">Rp 0</div>
+        <div class="cc-meter"><div class="cc-meter-fill" id="dash-cc-bar" style="width:0%"></div></div>
+        <div style="font-size:11px;color:var(--text-muted)" id="dash-cc-pct">0% dari total pengeluaran</div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-label">🏧 Utang Gua Aktif</div>
+        <div class="card-value" style="color:var(--orange)" id="dash-mydebt">Rp 0</div>
+        <div class="card-sub" id="dash-mydebt-sub">ke 0 orang</div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-label">💵 Income vs Spending</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums" id="dash-income-disp">Rp 0</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">income bulan ini</div>
+        <div class="cat-bar-track" style="height:8px;margin-bottom:6px"><div class="cat-bar-fill" id="spend-ratio-bar" style="width:0%;background:var(--red)"></div></div>
+        <div style="font-size:12px;color:var(--text-muted)" id="spend-ratio-label">Set income di Pengaturan</div>
+        <button class="btn btn-sm btn-amber" style="margin-top:10px" onclick="openSettings()">⚙ Set Income</button>
+      </div>
+      <div class="card">
+        <div class="section-title">Transaksi Terbaru</div>
+        <div id="recent-list" style="font-size:13px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Savings Rate + Cashflow Forecast + Net Worth Growth -->
+  <div class="grid-3" style="margin-bottom:20px">
+    <!-- Savings Rate -->
+    <div class="card">
+      <div class="section-title">💰 Savings Rate</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <div id="sr-emoji" style="font-size:28px">—</div>
+        <div>
+          <div style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-1px" id="sr-pct">—</div>
+          <div style="font-size:12px;font-weight:600" id="sr-label" style="margin-top:2px">—</div>
+        </div>
+      </div>
+      <div style="height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-bottom:8px">
+        <div id="sr-bar" style="height:100%;width:0%;border-radius:99px;transition:width .6s ease"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted)" id="sr-sub">Set income di Pengaturan</div>
+    </div>
+
+    <!-- Cashflow Forecast -->
+    <div class="card">
+      <div class="section-title">📈 Cashflow Forecast</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div id="cf-status-dot" style="width:12px;height:12px;border-radius:50%;background:var(--text-muted);flex-shrink:0"></div>
+        <div style="font-size:14px;font-weight:700" id="cf-status-text">—</div>
+      </div>
+      <div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.8px;margin-bottom:4px" id="cf-projected">Rp 0</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px" id="cf-projected-sub">proyeksi pengeluaran akhir bulan</div>
+      <div style="height:6px;background:var(--card2);border-radius:99px;overflow:hidden">
+        <div id="cf-bar" style="height:100%;width:0%;border-radius:99px;transition:width .6s ease"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px" id="cf-bar-label"></div>
+    </div>
+
+    <!-- Net Worth Growth -->
+    <div class="card">
+      <div class="section-title">💎 Net Worth Growth</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.8px" id="nwg-value">Rp 0</div>
+        <div id="nwg-badge" style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px" id="nwg-sub">net worth saat ini</div>
+      <div style="height:80px"><canvas id="nwgChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Monthly Comparison + Spending Heatmap -->
+  <div class="grid-2" style="margin-bottom:20px">
+    <!-- Monthly Comparison -->
+    <div class="card">
+      <div class="section-title">📊 Monthly Comparison <span id="mc-label" style="color:var(--text-muted);font-size:11px;font-weight:400"></span></div>
+      <div id="mc-list"></div>
+    </div>
+
+    <!-- Spending Heatmap -->
+    <div class="card">
+      <div class="section-title">🗓️ Spending Heatmap <span id="hm-month-label" style="color:var(--text-muted);font-size:11px;font-weight:400"></span></div>
+      <div id="heatmap-legend" style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted);margin-bottom:10px">
+        <span>Hemat</span>
+        <div style="display:flex;gap:2px">
+          <div style="width:14px;height:14px;border-radius:3px;background:var(--card2)"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:rgba(16,185,129,.25)"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:rgba(16,185,129,.55)"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,.55)"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:rgba(239,68,68,.7)"></div>
+        </div>
+        <span>Boros</span>
+      </div>
+      <div id="heatmap-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:4px">
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Min</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Sen</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Sel</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Rab</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Kam</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Jum</div>
+        <div style="font-size:9px;color:var(--text-muted);text-align:center">Sab</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSAKSI -->
+<div class="page" id="page-transaksi">
+  <div class="topbar"><div><h1>Semua Transaksi</h1></div></div>
+
+  <!-- Period filter -->
+  <div class="filter-bar" id="period-filter-bar">
+    <button class="filter-btn active" onclick="setPeriod('all',this)">Semua</button>
+    <button class="filter-btn" onclick="setPeriod('today',this)">Hari Ini</button>
+    <button class="filter-btn" onclick="setPeriod('week',this)">Minggu Ini</button>
+    <button class="filter-btn" onclick="setPeriod('month',this)">Bulan Ini</button>
+    <button class="filter-btn" onclick="setPeriod('custom',this)">📅 Custom</button>
+  </div>
+  <div id="custom-range-wrap" style="display:none;margin-bottom:14px">
+    <div class="form-grid-2" style="max-width:420px">
+      <div class="form-group"><label>Dari</label><input type="date" id="range-from" onchange="renderTransaksi()"/></div>
+      <div class="form-group"><label>Sampai</label><input type="date" id="range-to" onchange="renderTransaksi()"/></div>
+    </div>
+  </div>
+
+  <!-- Category/type filter -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">Semua Kategori</button>
+    <button class="filter-btn" onclick="setFilter('food',this)">🍜 Food</button>
+    <button class="filter-btn" onclick="setFilter('lifestyle',this)">🛒 Lifestyle</button>
+    <button class="filter-btn" onclick="setFilter('fixed',this)">📱 Fixed</button>
+    <button class="filter-btn" onclick="setFilter('cc',this)">💳 CC</button>
+    <button class="filter-btn" onclick="setFilter('income',this)">💵 Income</button>
+    <button class="filter-btn" onclick="setFilter('split',this)">🤝 Ada Piutang</button>
+    <button class="filter-btn" onclick="setFilter('mydebt',this)">🏧 Ada Utang Gua</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="grid-4" style="margin-bottom:16px">
+    <div class="card card-accent-blue"><div class="card-label">Total Nominal</div><div class="card-value" id="tx-sum-amount" style="font-size:20px">Rp 0</div><div class="card-sub" id="tx-sum-count">0 transaksi</div></div>
+    <div class="card card-accent-teal"><div class="card-label">Total Bagian Gua</div><div class="card-value" id="tx-sum-myshare" style="font-size:20px">Rp 0</div><div class="card-sub">setelah split</div></div>
+    <div class="card card-accent-green"><div class="card-label">Income</div><div class="card-value" id="tx-sum-income" style="font-size:20px;color:var(--green)">Rp 0</div><div class="card-sub">pemasukan periode ini</div></div>
+    <div class="card card-accent-red"><div class="card-label">Pengeluaran</div><div class="card-value" id="tx-sum-expense" style="font-size:20px;color:var(--red)">Rp 0</div><div class="card-sub">exclude CC payment</div></div>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Sumber</th>
+          <th style="text-align:right">Nominal</th><th style="text-align:right">Bagian Gua</th><th></th>
+        </tr></thead>
+        <tbody id="tx-tbody"></tbody>
+        <tfoot id="tx-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAMBAH -->
+<div class="page" id="page-tambah">
+  <div class="topbar"><div><h1>Tambah Transaksi</h1></div></div>
+  <div class="card" style="max-width:640px;margin:0 auto">
+    <div class="form-grid-2">
+      <div class="form-group"><label>Tanggal</label><input type="date" id="f-date"/></div>
+      <div class="form-group">
+        <label>Nominal (Rp)</label>
+        <input type="text" inputmode="decimal" id="f-amount" placeholder="17 → 17rb · 15.5 → 15.5rb" oninput="onAmountInput(this)" autocomplete="off" style="font-variant-numeric:tabular-nums"/>
+        <div id="f-amount-preview" style="font-size:11px;color:var(--teal);margin-top:2px;min-height:16px"></div>
+      </div>
+      <div class="form-group" style="grid-column:1/-1"><label>Deskripsi</label><input type="text" id="f-desc" placeholder="Makan siang warteg"/></div>
+      <div class="form-group"><label>Kategori</label>
+        <select id="f-cat">
+          <option value="food">🍜 Food & Drink</option>
+          <option value="lifestyle">🛒 Lifestyle</option>
+          <option value="fixed">📱 Fixed Cost</option>
+          <option value="cc">💳 CC Payment (bayar tagihan)</option>
+          <option value="income">💵 Income</option>
+          <option value="other">📦 Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Sumber</label>
+        <select id="f-src" onchange="onSrcChange(this)">
+          <option value="bni">🏦 BNI</option>
+          <option value="cash">💵 Cash</option>
+          <option value="cc">💳 Credit Card (swipe)</option>
+          <option value="transfer">📲 Transfer</option>
+        </select>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px" id="cc-src-hint"></div>
+      </div>
+      <div class="form-group" style="grid-column:1/-1"><label>Catatan</label><input type="text" id="f-note" placeholder="Opsional"/></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- SPLIT: orang yang utang ke gua -->
+    <label class="split-toggle">
+      <input type="checkbox" id="split-toggle" onchange="toggleSplit()"/>
+      <span>🤝 Ada yang utang ke gua di transaksi ini?</span>
+    </label>
+    <div id="split-section" style="display:none">
+      <div class="split-section">
+        <div class="split-section-title">🤝 Split Bill — Siapa yang utang?</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Isi nama + nominal. Sisa otomatis jadi bagian kamu.</div>
+        <div style="display:grid;grid-template-columns:1fr 130px auto;gap:8px;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Nama</span>
+          <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Utang (Rp)</span>
+          <span></span>
+        </div>
+        <div id="split-people-list" class="split-people-list"></div>
+        <button class="btn btn-teal btn-sm" onclick="addSplitPerson()" style="margin-bottom:14px">+ Tambah Orang</button>
+        <div class="split-summary" id="split-summary">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Ringkasan Split</div>
+          <div id="split-summary-rows"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:12px"></div>
+
+    <!-- MYDEBT: gua yang utang ke orang -->
+    <label class="mydebt-toggle">
+      <input type="checkbox" id="mydebt-toggle" onchange="toggleMyDebt()"/>
+      <span>🏧 Gua yang utang ke orang di transaksi ini?</span>
+    </label>
+    <div id="mydebt-section" style="display:none">
+      <div class="mydebt-section">
+        <div class="mydebt-section-title">🏧 Utang Gua — Ke siapa?</div>
+        <div class="form-grid-2">
+          <div class="form-group"><label>Nama Orang</label><input type="text" id="md-name" placeholder="Nama teman / merchant"/></div>
+          <div class="form-group"><label>Jumlah Utang (Rp)</label><input type="text" inputmode="decimal" id="md-amount" placeholder="17 → 17rb"/></div>
+        </div>
+        <div class="form-group"><label>Catatan Utang</label><input type="text" id="md-note" placeholder="Opsional — e.g. 'pinjam buat bensin'"/></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveTransaction()">💾 Simpan Transaksi</button>
+      <button class="btn btn-danger" onclick="resetForm()">✕ Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- TABUNGAN -->
+<div class="page" id="page-tabungan">
+  <div class="topbar"><div><h1>Tabungan & Saldo</h1></div></div>
+  <div class="grid-3">
+    <div class="card card-accent-green" style="text-align:center">
+      <div class="card-label">Estimasi Tabungan</div>
+      <div class="savings-progress">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="ring-bg" cx="70" cy="70" r="60"/>
+          <circle class="ring-fill" id="savings-ring" cx="70" cy="70" r="60" stroke-dasharray="377" stroke-dashoffset="377"/>
+        </svg>
+        <div class="savings-center"><div class="savings-pct" id="savings-pct">0%</div><div class="savings-lbl">TERSIMPAN</div></div>
+      </div>
+      <div class="card-value" id="savings-amount">Rp 0</div>
+      <div class="card-sub" id="savings-sub">dari Rp 0 income</div>
+    </div>
+    <div class="card card-accent-red"><div class="card-label">Total Pengeluaran Bulan Ini</div><div class="card-value" id="sav-spent">Rp 0</div><div class="card-sub">semua kategori</div></div>
+    <div class="card card-accent-blue"><div class="card-label">Rata-rata per Hari</div><div class="card-value" id="sav-avg">Rp 0</div><div class="card-sub">bulan berjalan</div></div>
+  </div>
+  <div class="card"><div class="section-title">Proyeksi Akhir Bulan</div><div style="font-size:13px;color:var(--text-dim)" id="sav-projection">Belum ada data.</div></div>
+</div>
+
+<!-- KREDIT -->
+<div class="page" id="page-kredit">
+  <div class="topbar"><div><h1>Credit Card Tracker</h1></div></div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-label">💳 Total Tagihan CC Bulan Ini</div>
+    <div class="card-value" style="color:var(--amber);font-size:32px" id="cc-total">Rp 0</div>
+    <div class="cc-meter"><div class="cc-meter-fill" id="cc-bar" style="width:0%"></div></div>
+    <div class="cc-stats-grid" style="margin-top:4px">
+      <div class="cc-stat"><div class="cc-stat-val" id="cc-count">0</div><div class="cc-stat-lbl">Transaksi CC</div></div>
+      <div class="cc-stat"><div class="cc-stat-val" id="cc-avg-val">Rp 0</div><div class="cc-stat-lbl">Rata-rata per tx</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-title">Semua Transaksi CC</div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Tanggal</th><th>Deskripsi</th><th style="text-align:right">Nominal</th></tr></thead><tbody id="cc-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- PIUTANG & UTANG -->
+<div class="page" id="page-utang">
+  <div class="topbar"><div><h1>🤝 Piutang & Utang</h1><div class="date-label">Tracking semua hutang piutang</div></div></div>
+
+  <div class="debt-tabs">
+    <button class="debt-tab active-teal" id="tab-piutang" onclick="switchDebtTab('piutang')">🤝 Piutang (orang utang ke gua)</button>
+    <button class="debt-tab" id="tab-mydebt" onclick="switchDebtTab('mydebt')">🏧 Utang Gua (gua utang ke orang)</button>
+  </div>
+
+  <!-- PIUTANG PANEL -->
+  <div class="debt-panel active" id="panel-piutang">
+    <div class="debt-summary-bar">
+      <div class="card card-accent-teal"><div class="card-label">Total Piutang</div><div class="card-value" id="piutang-total">Rp 0</div><div class="card-sub">belum lunas</div></div>
+      <div class="card card-accent-green"><div class="card-label">Sudah Dibayar</div><div class="card-value" id="piutang-paid">Rp 0</div><div class="card-sub">total terlunasi</div></div>
+      <div class="card card-accent-amber"><div class="card-label">Jumlah Orang</div><div class="card-value" id="piutang-count">0</div><div class="card-sub">orang masih hutang</div></div>
+    </div>
+    <div id="piutang-list"></div>
+  </div>
+
+  <!-- UTANG GUA PANEL -->
+  <div class="debt-panel" id="panel-mydebt">
+    <div class="debt-summary-bar">
+      <div class="card card-accent-orange"><div class="card-label">Total Utang Gua</div><div class="card-value" id="mydebt-total">Rp 0</div><div class="card-sub">belum lunas</div></div>
+      <div class="card card-accent-green"><div class="card-label">Sudah Dilunasi</div><div class="card-value" id="mydebt-paid">Rp 0</div><div class="card-sub">total terlunasi</div></div>
+      <div class="card card-accent-amber"><div class="card-label">Ke Berapa Orang</div><div class="card-value" id="mydebt-count">0</div><div class="card-sub">orang/tempat</div></div>
+    </div>
+    <div id="mydebt-list"></div>
+  </div>
+</div>
+
+<!-- TAMBAH UTANG GUA (standalone) -->
+<div class="page" id="page-tambahutang">
+  <div class="topbar"><div><h1>🏧 Catat Utang Gua</h1><div class="date-label">Gua yang pinjam / utang ke orang</div></div></div>
+  <div class="card" style="max-width:480px">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-grid-2">
+        <div class="form-group"><label>Tanggal</label><input type="date" id="ud-date"/></div>
+        <div class="form-group">
+          <label>Nominal Utang (Rp)</label>
+          <input type="text" inputmode="decimal" id="ud-amount" placeholder="17 → 17rb" oninput="el('ud-amount-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''"/>
+          <div id="ud-amount-preview" style="font-size:11px;color:var(--orange);margin-top:2px;min-height:16px"></div>
+        </div>
+      </div>
+      <div class="form-group"><label>Utang ke Siapa</label><input type="text" id="ud-name" placeholder="Nama teman / warung / dll"/></div>
+      <div class="form-group"><label>Deskripsi (opsional)</label><input type="text" id="ud-desc" placeholder="e.g. pinjam buat bensin"/></div>
+      <div class="form-group">
+        <label>Pinjam lewat / metode</label>
+        <select id="ud-method">
+          <option value="">— Opsional —</option>
+          <option value="Cash">Cash / tunai</option>
+          <option value="Transfer BNI">Transfer BNI</option>
+          <option value="Transfer BCA">Transfer BCA</option>
+          <option value="GoPay">GoPay</option>
+          <option value="OVO">OVO</option>
+          <option value="Dana">Dana</option>
+          <option value="ShopeePay">ShopeePay</option>
+          <option value="QRIS">QRIS</option>
+          <option value="Lainnya">Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Catatan</label><input type="text" id="ud-note" placeholder="Opsional"/></div>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-orange" onclick="saveMyDebtStandalone()">💾 Simpan Utang</button>
+      <button class="btn" style="background:var(--card2);color:var(--text-muted)" onclick="showPage('utang',null)">Lihat Semua Utang →</button>
+    </div>
+    <div style="margin-top:16px;padding:12px 14px;background:var(--card2);border-radius:10px;font-size:12px;color:var(--text-muted);line-height:1.7">
+      💡 <b>Tip:</b> Halaman ini khusus buat catat kalau <b>gua yang utang</b> ke orang.<br>
+      Kalau makan bareng dan orang yang utang ke gua, pakai menu <b>Tambah Transaksi</b> → centang 🤝 Split Bill.
+    </div>
+  </div>
+</div>
+
+
+<!-- ASET & KEKAYAAN -->
+<div class="page" id="page-aset">
+  <div class="topbar">
+    <div><h1>💎 Aset & Kekayaan</h1><div class="date-label">Net Worth & Level Keuangan</div></div>
+    <button class="btn btn-primary" onclick="openAddAsset()">➕ Tambah Aset</button>
+  </div>
+
+  <!-- Net Worth Summary -->
+  <div class="nw-grid">
+    <div class="card card-accent-green"><div class="card-label">Total Aset</div><div class="card-value" id="nw-total-aset">Rp 0</div><div class="card-sub">nilai saat ini</div></div>
+    <div class="card card-accent-red"><div class="card-label">Total Liabilitas</div><div class="card-value" id="nw-total-liab">Rp 0</div><div class="card-sub">hutang & kewajiban</div></div>
+    <div class="card card-accent-blue"><div class="card-label">Net Worth</div><div class="card-value" id="nw-networth">Rp 0</div><div class="card-sub" id="nw-networth-sub">aset - liabilitas</div></div>
+    <div class="card"><div class="card-label">Income Bulanan</div><div class="card-value" style="color:var(--purple)" id="nw-income-disp">Rp 0</div><div class="card-sub" id="nw-income-months">set di Pengaturan</div></div>
+  </div>
+
+  <!-- Level Keuangan -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="section-title">🏆 Level Keuangan</div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="nw-level-label" id="nw-level-text">—</div>
+      <div style="font-size:12px;color:var(--text-muted);flex:1" id="nw-level-desc"></div>
+    </div>
+    <div class="nw-level-bar"><div class="nw-level-fill" id="nw-level-bar" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px">
+      <span>Gaji ke Gaji</span><span>Dana Darurat</span><span>Investasi</span><span>Pre-Pensiun</span><span>Financial Free</span>
+    </div>
+    <div style="margin-top:14px;padding:12px 14px;background:var(--card2);border-radius:10px;font-size:12px;color:var(--text-dim);line-height:1.7" id="nw-level-advice"></div>
+  </div>
+
+  <!-- Breakdown -->
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="card"><div class="card-label" style="color:var(--green)">Aset Lancar</div><div class="card-value" style="color:var(--green)" id="nw-lancar">Rp 0</div><div class="card-sub">cash, tabungan, saham</div></div>
+    <div class="card"><div class="card-label" style="color:var(--blue)">Aset Tidak Lancar</div><div class="card-value" style="color:var(--blue)" id="nw-tdk-lancar">Rp 0</div><div class="card-sub">properti, kendaraan, dll</div></div>
+    <div class="card"><div class="card-label" style="color:var(--purple)">Investasi</div><div class="card-value" style="color:var(--purple)" id="nw-investasi">Rp 0</div><div class="card-sub">saham, reksa dana, dll</div></div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="asset-type-tabs">
+    <button class="asset-type-tab active" onclick="filterAssets('all',this)">Semua</button>
+    <button class="asset-type-tab" onclick="filterAssets('lancar',this)">💵 Aset Lancar</button>
+    <button class="asset-type-tab" onclick="filterAssets('tidak_lancar',this)">🏠 Tidak Lancar</button>
+    <button class="asset-type-tab" onclick="filterAssets('investasi',this)">📈 Investasi</button>
+    <button class="asset-type-tab" onclick="filterAssets('liabilitas',this)">💸 Liabilitas</button>
+  </div>
+
+  <div id="asset-list"></div>
+</div>
+
+<!-- IMPORT / EXPORT -->
+<div class="page" id="page-importexport">
+  <div class="topbar"><div><h1>📂 Import & Export Data</h1></div></div>
+
+  <!-- LAPORAN BULANAN -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="section-title">📑 Laporan Keuangan Bulanan</div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px;line-height:1.6">Generate laporan visual ala factsheet — ringkasan, tren, breakdown kategori, dan net worth untuk bulan yang dipilih.</p>
+    <div class="form-grid-2" style="max-width:420px;margin-bottom:14px">
+      <div class="form-group"><label>Pilih Bulan</label><input type="month" id="report-month"/></div>
+      <div class="form-group" style="justify-content:flex-end">
+        <label style="visibility:hidden">.</label>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="generateReport('png')">🖼️ Export PNG</button>
+          <button class="btn btn-green btn-sm" onclick="generateReport('pdf')">📄 Export PDF</button>
+        </div>
+      </div>
+    </div>
+    <div id="report-status" style="font-size:13px;display:none;margin-bottom:10px"></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">📤 Export Data</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Download semua transaksi kamu. Bisa dibuka di Excel / Google Sheets.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-green" onclick="exportXLSX()">📊 Export ke Excel (.xlsx)</button>
+        <button class="btn btn-teal" onclick="exportCSV()">📄 Export ke CSV</button>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        <b>Format kolom:</b> Tanggal, Deskripsi, Kategori, Sumber, Nominal, Bagian Gua, Piutang, Utang Gua, Catatan
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">📥 Import Data</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Upload file CSV atau Excel. Data akan ditambahkan ke transaksi yang sudah ada (tidak dihapus).</p>
+      <div class="import-drop" id="import-drop" onclick="document.getElementById('import-file').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+        <div style="font-size:28px;margin-bottom:8px">📁</div>
+        <div style="font-weight:600">Klik atau drag file di sini</div>
+        <div style="font-size:12px;margin-top:4px">CSV / Excel (.xlsx, .xls)</div>
+      </div>
+      <input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleImportFile(this)"/>
+      <div id="import-status" style="margin-top:12px;font-size:13px;display:none"></div>
+      <div class="divider"></div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        <b>Kolom yang dikenali:</b><br>
+        <code style="background:var(--card2);padding:2px 6px;border-radius:4px;font-size:11px">Tanggal, Deskripsi, Kategori, Sumber, Nominal</code><br>
+        <span style="margin-top:4px;display:block">Kolom lain (Catatan, Piutang, UtangGua) opsional.</span>
+        <div style="margin-top:10px;padding:10px 12px;background:var(--purple-dim);border-radius:8px;color:var(--purple)">
+          💎 <b>Update harga aset (saham/kripto/dll):</b> edit kolom <code>NilaiSekarang(manual)</code> di sheet <b>Aset</b> pada file export, lalu re-import. Nama aset harus sama persis.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- MODAL TAMBAH/EDIT ASET -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal" style="width:580px">
+    <h2 id="asset-modal-title">➕ Tambah Aset</h2>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="form-group">
+        <label>Nama Aset</label>
+        <input type="text" id="am-name" placeholder="e.g. Honda Beat 2022, BTC, Apartemen"/>
+      </div>
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="am-cat" onchange="onAssetCatChange()">
+          <optgroup label="── Aset Lancar ──">
+            <option value="cash">💵 Cash / Tabungan</option>
+            <option value="deposito">🏦 Deposito</option>
+          </optgroup>
+          <optgroup label="── Investasi ──">
+            <option value="saham">📈 Saham</option>
+            <option value="reksa_dana">📊 Reksa Dana</option>
+            <option value="obligasi">📄 Obligasi / SBN</option>
+            <option value="kripto">₿ Kripto</option>
+            <option value="emas">🥇 Emas</option>
+          </optgroup>
+          <optgroup label="── Aset Tidak Lancar ──">
+            <option value="motor">🏍️ Motor</option>
+            <option value="mobil">🚗 Mobil</option>
+            <option value="rumah">🏠 Rumah / Properti</option>
+            <option value="apartemen">🏢 Apartemen</option>
+            <option value="tanah">🌿 Tanah</option>
+            <option value="elektronik">📱 Elektronik / HP</option>
+            <option value="laptop">💻 Laptop</option>
+            <option value="lainnya_aset">📦 Aset Lainnya</option>
+          </optgroup>
+          <optgroup label="── Liabilitas ──">
+            <option value="kpr">🏠 KPR</option>
+            <option value="kkb">🚗 KKB (Kredit Kendaraan)</option>
+            <option value="hutang_lainnya">💸 Hutang Lainnya</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nilai Beli / Pokok (Rp)</label>
+        <input type="text" inputmode="decimal" id="am-buy-price" placeholder="e.g. 18jt" oninput="el('am-buy-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''; calcAssetPreview()"/>
+        <div id="am-buy-preview" style="font-size:11px;color:var(--teal);margin-top:2px;min-height:14px"></div>
+      </div>
+      <div class="form-group" id="am-year-group">
+        <label>Tahun Beli / Mulai</label>
+        <input type="number" id="am-year" placeholder="e.g. 2021" min="1990" max="2099" oninput="calcAssetPreview()"/>
+      </div>
+      <div class="form-group" id="am-current-group" style="display:none">
+        <label>Nilai Saat Ini (Rp) — update manual</label>
+        <input type="text" inputmode="decimal" id="am-current-price" placeholder="harga pasar sekarang" oninput="el('am-current-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''"/>
+        <div id="am-current-preview" style="font-size:11px;color:var(--purple);margin-top:2px;min-height:14px"></div>
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <input type="text" id="am-note" placeholder="Opsional"/>
+      </div>
+    </div>
+    <!-- Preview nilai saat ini -->
+    <div id="am-preview-box" style="display:none;background:var(--card2);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📊 Estimasi Nilai Saat Ini</div>
+      <div id="am-preview-content"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeAssetModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveAsset()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SETTINGS -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ Pengaturan</h2>
+    <div class="form-group" style="margin-bottom:14px"><label>Income Bulanan (Rp)</label><input type="number" id="set-income" placeholder="contoh: 10000000"/></div>
+    <div class="form-group" style="margin-bottom:14px"><label>Nama Akun</label><input type="text" id="set-name" placeholder="BNI Main Account"/></div>
+    <div class="form-group" style="margin-bottom:14px"><label>Limit CC (Rp)</label><input type="number" id="set-cclimit" placeholder="contoh: 5000000"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeSettings()">Batal</button>
+      <button class="btn btn-primary" onclick="saveSettings()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SETTLE -->
+<div class="modal-overlay" id="settle-modal">
+  <div class="modal" style="width:380px">
+    <h2 id="settle-modal-title">Tandai Lunas</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px" id="settle-modal-desc"></p>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Bayar lewat apa?</label>
+      <select id="settle-method-sel">
+        <option value="">— Pilih metode —</option>
+        <option value="Transfer BNI">Transfer BNI</option>
+        <option value="Transfer BCA">Transfer BCA</option>
+        <option value="GoPay">GoPay</option>
+        <option value="OVO">OVO</option>
+        <option value="Dana">Dana</option>
+        <option value="ShopeePay">ShopeePay</option>
+        <option value="Cash">Cash</option>
+        <option value="Qris">QRIS</option>
+        <option value="Lainnya">Lainnya</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label>Catatan (opsional)</label>
+      <input type="text" id="settle-note-inp" placeholder="e.g. 'kirim 10 Juni'"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeSettleModal()">Batal</button>
+      <button class="btn btn-primary" id="settle-confirm-btn" onclick="confirmSettle()">✅ Tandai Lunas</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT TRANSAKSI -->
+<div class="modal-overlay" id="edit-tx-modal">
+  <div class="modal" style="width:620px">
+    <h2>✏️ Edit Transaksi</h2>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="form-group"><label>Tanggal</label><input type="date" id="etx-date"/></div>
+      <div class="form-group">
+        <label>Nominal (Rp)</label>
+        <input type="text" inputmode="decimal" id="etx-amount" placeholder="17 → 17rb" oninput="el('etx-amount-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''; refreshEditSplitSummary()"/>
+        <div id="etx-amount-preview" style="font-size:11px;color:var(--teal);margin-top:2px;min-height:16px"></div>
+      </div>
+      <div class="form-group"><label>Deskripsi</label><input type="text" id="etx-desc"/></div>
+      <div class="form-group"><label>Kategori</label>
+        <select id="etx-cat">
+          <option value="food">🍜 Food & Drink</option>
+          <option value="lifestyle">🛒 Lifestyle</option>
+          <option value="fixed">📱 Fixed Cost</option>
+          <option value="cc">💳 CC Payment</option>
+          <option value="income">💵 Income</option>
+          <option value="other">📦 Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Sumber</label>
+        <select id="etx-src">
+          <option value="bni">🏦 BNI</option>
+          <option value="cash">💵 Cash</option>
+          <option value="cc">💳 Credit Card</option>
+          <option value="transfer">📲 Transfer</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Catatan</label><input type="text" id="etx-note"/></div>
+    </div>
+    <!-- Split bill editor di dalam modal edit -->
+    <div id="etx-split-wrap" style="display:none">
+      <div style="height:1px;background:var(--border);margin:4px 0 14px"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🤝 Edit Split Bill</div>
+      <div style="display:grid;grid-template-columns:1fr 130px auto;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Nama</span>
+        <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Nominal</span>
+        <span></span>
+      </div>
+      <div id="etx-split-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <button class="btn btn-teal btn-sm" onclick="addEditSplitPerson()" style="margin-bottom:12px">+ Tambah Orang</button>
+      <div id="etx-split-summary" style="background:var(--card2);border-radius:8px;padding:10px 14px;font-size:12px"></div>
+    </div>
+    <!-- My debt editor di dalam modal edit -->
+    <div id="etx-mydebt-wrap" style="display:none">
+      <div style="height:1px;background:var(--border);margin:4px 0 14px"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🏧 Edit Utang Gua</div>
+      <div class="form-grid-2">
+        <div class="form-group"><label>Utang ke Siapa</label><input type="text" id="etx-md-name" placeholder="Nama orang"/></div>
+        <div class="form-group">
+          <label>Nominal Utang (Rp)</label>
+          <input type="text" inputmode="decimal" id="etx-md-amount" placeholder="17 → 17rb" oninput="el('etx-md-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''"/>
+          <div id="etx-md-preview" style="font-size:11px;color:var(--orange);margin-top:2px;min-height:16px"></div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:4px"><label>Catatan Utang</label><input type="text" id="etx-md-note" placeholder="Opsional"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeEditTx()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditTx()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT PIUTANG -->
+<div class="modal-overlay" id="edit-piutang-modal">
+  <div class="modal" style="width:420px">
+    <h2>✏️ Edit Piutang</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px" id="edit-piutang-desc"></p>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Nama</label>
+      <input type="text" id="ep-name" placeholder="Nama orang"/>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label>Nominal Utang (Rp)</label>
+      <input type="text" inputmode="decimal" id="ep-amount" placeholder="17 → 17rb" oninput="el('ep-amount-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''"/>
+      <div id="ep-amount-preview" style="font-size:11px;color:var(--teal);margin-top:2px;min-height:16px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeEditPiutang()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditPiutang()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT MY DEBT -->
+<div class="modal-overlay" id="edit-mydebt-modal">
+  <div class="modal" style="width:420px">
+    <h2>✏️ Edit Utang Gua</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px" id="edit-mydebt-desc"></p>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Utang ke Siapa</label>
+      <input type="text" id="emd-name" placeholder="Nama orang"/>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Nominal (Rp)</label>
+      <input type="text" inputmode="decimal" id="emd-amount" placeholder="17 → 17rb" oninput="el('emd-amount-preview').textContent=parseShorthand(this.value)>0?'= '+fmt(parseShorthand(this.value)):''"/>
+      <div id="emd-amount-preview" style="font-size:11px;color:var(--orange);margin-top:2px;min-height:16px"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label>Catatan</label>
+      <input type="text" id="emd-note" placeholder="Opsional"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeEditMyDebt()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditMyDebt()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="database.js"></script>
+<script src="debt.js"></script>
+<script src="charts.js"></script>
+<script src="assets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+
+
+
