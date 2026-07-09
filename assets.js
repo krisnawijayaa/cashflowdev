@@ -1,4 +1,4 @@
-﻿// ─── ASSETS & NET WORTH ──────────────────────────────────────────────────────
+// ─── ASSETS & NET WORTH ──────────────────────────────────────────────────────
 let assets = [];
 try { assets = JSON.parse(localStorage.getItem('cf_assets') || '[]'); } catch(e) { assets = []; }
 
@@ -38,7 +38,8 @@ function getCurrentValue(asset){
     return asset.currentPrice != null ? asset.currentPrice : asset.buyPrice;
   }
   const rate = DEPR_RATES[asset.cat] || -0.10;
-  const years = new Date().getFullYear() - (asset.year || new Date().getFullYear());
+  const currentYear = jakartaNow().getFullYear();
+  const years = currentYear - (asset.year || currentYear);
   if(years <= 0) return asset.buyPrice;
   // Compound depreciation/appreciation
   const val = asset.buyPrice * Math.pow(1 + rate, years);
@@ -55,7 +56,7 @@ function openAddAsset(){
   el('am-cat').value = 'cash';
   el('am-buy-price').value = '';
   el('am-buy-preview').textContent = '';
-  el('am-year').value = new Date().getFullYear();
+  el('am-year').value = jakartaNow().getFullYear();
   el('am-current-price').value = '';
   el('am-current-preview').textContent = '';
   el('am-note').value = '';
@@ -101,14 +102,14 @@ function onAssetCatChange(){
 function calcAssetPreview(){
   const cat = el('am-cat').value;
   const buyPrice = parseShorthand(el('am-buy-price').value);
-  const year = parseInt(el('am-year').value) || new Date().getFullYear();
+  const year = parseInt(el('am-year').value) || jakartaNow().getFullYear();
   const box = el('am-preview-box');
   const content = el('am-preview-content');
   if(!buyPrice){ box.style.display='none'; return; }
   box.style.display = 'block';
 
   const rate = DEPR_RATES[cat] || 0;
-  const years = new Date().getFullYear() - year;
+  const years = jakartaNow().getFullYear() - year;
   const currentVal = MANUAL_PRICE_CATS.has(cat)
     ? (parseShorthand(el('am-current-price').value) || buyPrice)
     : Math.max(buyPrice * Math.pow(1+rate, Math.max(0,years)), buyPrice*0.05);
@@ -169,7 +170,7 @@ function filterAssets(f, btn){
 }
 
 function renderAset(){
-  const now = new Date().getFullYear();
+  const now = jakartaNow().getFullYear();
   const income = settings.income || 0;
 
   // Totals

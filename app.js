@@ -1,17 +1,85 @@
-﻿// ─── UTILS ──────────────────────────────────────────────────────────────────
+// ─── UTILS ──────────────────────────────────────────────────────────────────
 const fmt = n => 'Rp ' + Math.abs(Math.round(n)).toLocaleString('id-ID');
-const todayStr = () => new Date().toISOString().slice(0,10);
 const el = id => document.getElementById(id);
 const safe = (id, val, prop='textContent') => { const e = el(id); if(e) e[prop] = val; };
 
+// ─── DATE HELPERS (single source of truth — always Asia/Jakarta) ────────────
+// The whole app must agree on "what day is it" regardless of the device's own
+// timezone. Every "today / now" calculation MUST go through jakartaNow()/todayStr()
+// below instead of calling `new Date()` or `.toISOString()` directly.
+const APP_TIMEZONE = 'Asia/Jakarta';
+
+// Reads the wall-clock date/time in Asia/Jakarta for a given instant (default: now).
+function getJakartaParts(date){
+  const d = date || new Date();
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(d).forEach(p => { if(p.type !== 'literal') parts[p.type] = p.value; });
+  return {
+    y: parseInt(parts.year, 10),
+    m: parseInt(parts.month, 10),
+    d: parseInt(parts.day, 10),
+    hh: parseInt(parts.hour, 10) % 24,
+    mm: parseInt(parts.minute, 10),
+    ss: parseInt(parts.second, 10)
+  };
+}
+
+// Returns a Date object whose LOCAL getters (getFullYear/getMonth/getDate/getDay/
+// getHours/setDate/...) reflect the current Asia/Jakarta wall-clock time — no
+// matter what timezone the user's device is actually set to.
+// IMPORTANT: only use local getters on this object. Never call toISOString()/
+// getUTC*() on it — that would re-interpret it using the device's real offset
+// and reintroduce the timezone bug this helper exists to prevent.
+function jakartaNow(){
+  const p = getJakartaParts();
+  return new Date(p.y, p.m - 1, p.d, p.hh, p.mm, p.ss);
+}
+
+// Formats a Date object as "YYYY-MM-DD" using its LOCAL fields (never UTC).
+// Safe to use on Date objects produced by jakartaNow() (or derived from it via
+// setDate/setMonth/etc.) since those objects' local fields already represent
+// Jakarta wall-clock time.
+function dateToStr(date){
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+// Parses a "YYYY-MM-DD" string into a local Date built from its explicit y/m/d
+// numbers. Use this instead of `new Date(dateStr)` — the native constructor
+// treats date-only strings as UTC midnight, which shifts the weekday/date by
+// one when read back with local getters (getDay/getDate) on devices whose
+// timezone differs from UTC.
+function parseDateStr(dateStr){
+  const [y,m,d] = dateStr.slice(0,10).split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+// "Today" as YYYY-MM-DD in Asia/Jakarta — the one function the rest of the app
+// should call whenever it needs "today's date".
+function todayStr(){
+  const p = getJakartaParts();
+  return `${p.y}-${String(p.m).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`;
+}
+
 function isSameDay(d1,d2){ return d1.slice(0,10)===d2.slice(0,10); }
 function isSameMonth(d){
-  const n=new Date();
-  return d.slice(0,7)===`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+  return d.slice(0,7) === todayStr().slice(0,7);
+}
+// Pure calendar-day difference between two "YYYY-MM-DD" strings (today - d),
+// independent of time-of-day / real elapsed milliseconds / device timezone.
+function daysSince(dateStr){
+  const [ty,tm,td] = todayStr().split('-').map(Number);
+  const [dy,dm,dd] = dateStr.slice(0,10).split('-').map(Number);
+  const a = Date.UTC(ty,tm-1,td);
+  const b = Date.UTC(dy,dm-1,dd);
+  return Math.round((a-b)/864e5);
 }
 function isThisWeek(d){
-  const diff=(new Date()-new Date(d))/(864e5);
-  return diff>=0&&diff<7;
+  const diff = daysSince(d);
+  return diff>=0 && diff<7;
 }
 
 function showToast(msg){
@@ -92,7 +160,7 @@ function deleteTransaction(id){
 
 // ─── RENDER DASHBOARD ────────────────────────────────────────────────────────
 function renderDashboard(){
-  const now = new Date();
+  const now = jakartaNow();
   safe('today-label', now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'}));
 
   // Exclude income & CC payment (cat=cc) dari spending — CC payment bukan pengeluaran baru,
@@ -155,7 +223,7 @@ function renderCatBars(monthTx, monthTotal){
   const maxCat=Math.max(...Object.values(cats),1);
   const catNames={food:'🍜 Food',lifestyle:'🛒 Lifestyle',fixed:'📱 Fixed',cc:'💳 CC',other:'📦 Lainnya'};
   const catColors={food:'var(--green)',lifestyle:'var(--purple)',fixed:'var(--blue)',cc:'var(--amber)',other:'var(--text-dim)'};
-  const now=new Date();
+  const now=jakartaNow();
   safe('cat-month-label',now.toLocaleDateString('id-ID',{month:'long',year:'numeric'}));
   const catBarsEl=el('cat-bars');
   const entries=Object.entries(cats).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
@@ -173,7 +241,7 @@ function renderCatBars(monthTx, monthTotal){
 
 function renderInsights(monthTx, monthTotal, income, piutangAmt, myDebtAmt){
   const items=[];
-  const now=new Date();
+  const now=jakartaNow();
   const daysElapsed=now.getDate();
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const daysLeft=daysInMonth-daysElapsed;
@@ -222,8 +290,8 @@ function renderInsights(monthTx, monthTotal, income, piutangAmt, myDebtAmt){
     }
 
     // Weekend vs weekday
-    const weekendTx=monthTx.filter(t=>{ const d=new Date(t.date); return d.getDay()===0||d.getDay()===6; });
-    const weekdayTx=monthTx.filter(t=>{ const d=new Date(t.date); return d.getDay()>0&&d.getDay()<6; });
+    const weekendTx=monthTx.filter(t=>{ const d=parseDateStr(t.date); return d.getDay()===0||d.getDay()===6; });
+    const weekdayTx=monthTx.filter(t=>{ const d=parseDateStr(t.date); return d.getDay()>0&&d.getDay()<6; });
     if(weekendTx.length>0&&weekdayTx.length>0){
       const wkndAvg=weekendTx.reduce((s,t)=>s+(t.myShare!=null?t.myShare:t.amount),0)/weekendTx.length;
       const wkdayAvg=weekdayTx.reduce((s,t)=>s+(t.myShare!=null?t.myShare:t.amount),0)/weekdayTx.length;
@@ -345,7 +413,7 @@ function renderTransaksi(){
 
 // ─── RENDER TABUNGAN ─────────────────────────────────────────────────────────
 function renderTabungan(){
-  const now=new Date();
+  const now=jakartaNow();
   // Exclude CC payment dari spending (sama seperti dashboard)
   const monthTx=transactions.filter(t=>isSameMonth(t.date)&&t.cat!=='income'&&t.cat!=='cc');
   const spent=monthTx.reduce((s,t)=>s+(t.myShare!=null?t.myShare:t.amount),0);
@@ -896,7 +964,7 @@ function buildReportElement(d){
       const yLabel = sim.years>0 ? `${sim.years} tahun` : '';
       const mLabel = sim.remMonths>0 ? `${sim.remMonths} bulan` : '';
       const combined = [yLabel,mLabel].filter(Boolean).join(' ');
-      const targetDate = new Date(); targetDate.setMonth(targetDate.getMonth()+sim.months);
+      const targetDate = jakartaNow(); targetDate.setMonth(targetDate.getMonth()+sim.months);
       return `<b>${combined}</b> <span style="color:${C.textMuted}">(≈ ${targetDate.toLocaleDateString('id-ID',{month:'long',year:'numeric'})})</span>`;
     };
 
@@ -931,7 +999,7 @@ function buildReportElement(d){
         <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;color:${C.text}">${d.monthLabel}</div>
       </div>
       <div style="text-align:right;font-size:11px;color:${C.textMuted}">
-        Dibuat: ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}<br>
+        Dibuat: ${jakartaNow().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}<br>
         ${escHtml(settings.name||'Personal Finance')}
       </div>
     </div>

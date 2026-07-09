@@ -1,4 +1,4 @@
-﻿// ─── STATE ─────────────────────────────────────────────────────────────────
+// ─── STATE ─────────────────────────────────────────────────────────────────
 let transactions = [];
 let settings = {income:0,name:'BNI Main Account',cclimit:5000000};
 let splitPeople = [];
@@ -267,7 +267,7 @@ function importFromXLSX(buf){
             name,
             cat: catKey || 'lainnya_aset',
             buyPrice,
-            year: !isNaN(yearRaw)&&yearRaw>1900 ? yearRaw : new Date().getFullYear(),
+            year: !isNaN(yearRaw)&&yearRaw>1900 ? yearRaw : jakartaNow().getFullYear(),
             currentPrice: !isNaN(manualRaw)&&manualRaw>0 ? manualRaw : null,
             note: noteRaw,
             addedDate: todayStr()

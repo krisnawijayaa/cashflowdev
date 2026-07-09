@@ -1,4 +1,4 @@
-﻿// ─── WIDGET: SAVINGS RATE ────────────────────────────────────────────────────
+// ─── WIDGET: SAVINGS RATE ────────────────────────────────────────────────────
 function renderSavingsRate(monthTotal, income){
   const inc = income || 0;
   if(inc <= 0){
@@ -26,7 +26,7 @@ function renderSavingsRate(monthTotal, income){
 
 // ─── WIDGET: CASHFLOW FORECAST ───────────────────────────────────────────────
 function renderCashflowForecast(monthTotal, income){
-  const now = new Date();
+  const now = jakartaNow();
   const daysElapsed = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   if(daysElapsed === 0){ safe('cf-projected','—'); return; }
@@ -62,7 +62,7 @@ function renderCashflowForecast(monthTotal, income){
 let nwgChart = null;
 function renderNetWorthGrowth(){
   // Hitung net worth per 6 bulan terakhir
-  const now = new Date();
+  const now = jakartaNow();
   const labels=[], data=[];
   for(let i=5;i>=0;i--){
     const dt = new Date(now.getFullYear(), now.getMonth()-i, 1);
@@ -108,7 +108,7 @@ function renderNetWorthGrowth(){
 
 // ─── WIDGET: MONTHLY COMPARISON ──────────────────────────────────────────────
 function renderMonthlyComparison(){
-  const now = new Date();
+  const now = jakartaNow();
   const getMonthSpend = (y, m) => {
     const ys = String(m).padStart(2,'0');
     const start=`${y}-${ys}-01`, end=`${y}-${ys}-${new Date(y,m,0).getDate()}`;
@@ -152,8 +152,20 @@ function renderMonthlyComparison(){
 }
 
 // ─── WIDGET: SPENDING HEATMAP ────────────────────────────────────────────────
+// Linear-interpolated percentile of a SORTED numeric array (0<=q<=1).
+// Used instead of "fraction of max" so a single outlier day doesn't flatten
+// the color scale for every other day in the month.
+function quantile(sortedArr, q){
+  if(!sortedArr.length) return 0;
+  if(sortedArr.length === 1) return sortedArr[0];
+  const idx = (sortedArr.length - 1) * q;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if(lo === hi) return sortedArr[lo];
+  return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * (idx - lo);
+}
+
 function renderSpendingHeatmap(){
-  const now = new Date();
+  const now = jakartaNow();
   const y=now.getFullYear(), m=now.getMonth();
   const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(y, m+1, 0).getDate();
@@ -168,9 +180,10 @@ function renderSpendingHeatmap(){
   transactions.filter(t=>t.date.slice(0,7)===`${y}-${ms}`&&t.cat!=='income'&&t.cat!=='cc')
     .forEach(t=>{ const d=parseInt(t.date.slice(8,10)); dailySpend[d]=(dailySpend[d]||0)+(t.myShare!=null?t.myShare:t.amount); });
 
-  const vals = Object.values(dailySpend).filter(v=>v>0);
-  const maxSpend = vals.length ? Math.max(...vals) : 1;
-  const p25 = maxSpend*0.25, p60 = maxSpend*0.60, p85 = maxSpend*0.85;
+  // Percentile-based thresholds (instead of "% of max") so one big outlier
+  // transaction doesn't wash out the color scale for every other day.
+  const vals = Object.values(dailySpend).filter(v=>v>0).sort((a,b)=>a-b);
+  const p25 = quantile(vals, 0.25), p60 = quantile(vals, 0.60), p85 = quantile(vals, 0.85);
 
   const getColor = (spend, day) => {
     if(day > today) return 'var(--card2)'; // future
@@ -203,10 +216,10 @@ function renderTrendChart(){
   const ctx=canvas.getContext('2d');
   const labels=[], data=[], fullDates=[];
 
-  const today = new Date();
+  const today = jakartaNow();
   for(let i=29;i>=0;i--){
     const d=new Date(today); d.setDate(today.getDate()-i);
-    const ds=d.toISOString().slice(0,10);
+    const ds=dateToStr(d);
     if(ds>todayStr()) continue;
     fullDates.push(ds);
     labels.push(ds.slice(5));
