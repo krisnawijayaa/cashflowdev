@@ -222,6 +222,12 @@
 <div class="page" id="page-transaksi">
   <div class="topbar"><div><h1>Semua Transaksi</h1></div></div>
 
+  <!-- Search -->
+  <div class="form-group" style="max-width:420px;margin-bottom:14px">
+    <label>🔍 Cari Transaksi</label>
+    <input type="text" id="tx-search" placeholder="Cari nama, keterangan, kategori, metode, atau nominal..." oninput="onTxSearchInput(this)" autocomplete="off"/>
+  </div>
+
   <!-- Period filter -->
   <div class="filter-bar" id="period-filter-bar">
     <button class="filter-btn active" onclick="setPeriod('all',this)">Semua</button>
@@ -413,6 +419,16 @@
       <div class="card card-accent-teal"><div class="card-label">Total Piutang</div><div class="card-value" id="piutang-total">Rp 0</div><div class="card-sub">belum lunas</div></div>
       <div class="card card-accent-green"><div class="card-label">Sudah Dibayar</div><div class="card-value" id="piutang-paid">Rp 0</div><div class="card-sub">total terlunasi</div></div>
       <div class="card card-accent-amber"><div class="card-label">Jumlah Orang</div><div class="card-value" id="piutang-count">0</div><div class="card-sub">orang masih hutang</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--text-muted)">✔️ Centang debitur, lalu klik "Tagih" untuk membuat invoice (hanya berisi transaksi belum lunas).</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <select id="invoice-mode" aria-label="Mode invoice" style="width:auto;min-width:170px;padding:9px 10px">
+          <option value="separate">Invoice per debitur</option>
+          <option value="combined">Satu invoice gabungan</option>
+        </select>
+        <button class="btn btn-teal" id="btn-tagih-selected" disabled onclick="generateInvoices()">🧾 Tagih Terpilih</button>
+      </div>
     </div>
     <div id="piutang-list"></div>
   </div>
@@ -804,6 +820,25 @@
     <div class="modal-actions">
       <button class="btn btn-danger" onclick="closeEditMyDebt()">Batal</button>
       <button class="btn btn-primary" onclick="saveEditMyDebt()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INVOICE PIUTANG -->
+<div class="modal-overlay" id="invoice-modal">
+  <div class="modal" style="width:680px">
+    <h2>🧾 Preview Invoice</h2>
+    <div id="invoice-nav-bar" style="display:none;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button class="btn btn-sm" style="background:var(--card2);color:var(--text-muted)" onclick="prevInvoice()">← Sebelumnya</button>
+      <span style="font-size:12px;color:var(--text-muted)" id="invoice-counter"></span>
+      <button class="btn btn-sm" style="background:var(--card2);color:var(--text-muted)" onclick="nextInvoice()">Selanjutnya →</button>
+    </div>
+    <div id="invoice-preview-wrap" style="background:#fff;border-radius:10px;overflow:auto;max-height:60vh"></div>
+    <div class="modal-actions" style="flex-wrap:wrap">
+      <button class="btn btn-danger" onclick="closeInvoiceModal()">Tutup</button>
+      <button class="btn btn-teal" onclick="shareCurrentInvoice()">📤 Bagikan</button>
+      <button class="btn btn-green" onclick="downloadCurrentInvoicePDF()">📄 Download PDF</button>
+      <button class="btn btn-primary" id="btn-download-all" style="display:none" onclick="downloadAllInvoicesPDF()">📦 Download Semua PDF</button>
     </div>
   </div>
 </div>

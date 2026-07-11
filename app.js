@@ -322,6 +322,31 @@ function renderRecent(){
 
 // ─── RENDER TRANSAKSI ────────────────────────────────────────────────────────
 let currentPeriod = 'all';
+let transactionSearchQuery = '';
+
+// Pencarian transaksi bersifat real-time dan tetap mengikuti filter periode/kategori.
+// Normalisasi angka membuat "20000", "20.000", dan "Rp 20.000" menemukan nominal yang sama.
+function normalizeSearchText(value){
+  return String(value == null ? '' : value).toLocaleLowerCase('id-ID').replace(/[^a-z0-9]+/g,'');
+}
+function onTxSearchInput(input){
+  transactionSearchQuery = input ? input.value.trim() : '';
+  renderTransaksi();
+}
+function transactionMatchesSearch(tx, query){
+  if(!query) return true;
+  const categoryNames={food:'food drink makanan',lifestyle:'lifestyle',fixed:'fixed cost tagihan',cc:'cc credit card',income:'income pemasukan',other:'lainnya'};
+  const sourceNames={bni:'bni',bca:'bca',cash:'cash tunai',transfer:'transfer',gopay:'gopay',ovo:'ovo',dana:'dana',shopeepay:'shopeepay',qris:'qris',cc:'credit card kartu kredit'};
+  const people=[];
+  if(tx.split) tx.split.forEach(p=>people.push(p.name));
+  if(tx.myDebt) people.push(tx.myDebt.to);
+  const searchable=[
+    tx.desc, tx.note, tx.cat, categoryNames[tx.cat], tx.src, sourceNames[tx.src],
+    tx.amount, fmt(tx.amount), tx.myShare, fmt(tx.myShare != null ? tx.myShare : tx.amount),
+    ...people
+  ].map(normalizeSearchText).join(' ');
+  return searchable.includes(normalizeSearchText(query));
+}
 function setFilter(f,btn){
   currentFilter=f;
   document.querySelectorAll('#page-transaksi .filter-bar:nth-of-type(2) .filter-btn').forEach(b=>b.classList.remove('active'));
@@ -359,6 +384,7 @@ function renderTransaksi(){
   if(currentFilter==='split') txs=txs.filter(t=>t.split&&t.split.length>0);
   else if(currentFilter==='mydebt') txs=txs.filter(t=>t.myDebt);
   else if(currentFilter!=='all') txs=txs.filter(t=>t.cat===currentFilter||t.src===currentFilter);
+  txs=txs.filter(t=>transactionMatchesSearch(t, transactionSearchQuery));
 
   // Summary calculations (based on filtered txs)
   let sumAmount=0, sumMyShare=0, sumIncome=0, sumExpense=0;
@@ -379,7 +405,7 @@ function renderTransaksi(){
   const tbody=el('tx-tbody'); const tfoot=el('tx-tfoot');
   if(!tbody) return;
   if(!txs.length){
-    tbody.innerHTML='<tr class="empty-row"><td colspan="7">Tidak ada transaksi di periode ini</td></tr>';
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="7">${transactionSearchQuery ? 'Transaksi tidak ditemukan' : 'Tidak ada transaksi di periode ini'}</td></tr>`;
     if(tfoot) tfoot.innerHTML='';
     return;
   }
