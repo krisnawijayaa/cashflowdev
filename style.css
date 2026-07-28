@@ -17,7 +17,9 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex}
 /* SIDEBAR */
 .sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:24px 16px;position:fixed;top:0;left:0;bottom:0;z-index:100;overflow-y:auto}
 .logo{font-size:18px;font-weight:800;letter-spacing:-.5px;color:#fff;margin-bottom:36px;display:flex;align-items:center;gap:10px}
-.logo span{width:32px;height:32px;background:var(--blue);border-radius:8px;display:grid;place-items:center;font-size:16px}
+.logo span,.logo img{width:32px;height:32px;background:var(--blue);border-radius:8px;display:grid;place-items:center;font-size:16px}
+.logo img{object-fit:cover;background:transparent}
+.logo .brand-mark{background:#fff;color:#020617;border:2px solid #fff;font-size:18px;font-weight:900;font-family:Inter,Arial,sans-serif;letter-spacing:-.5px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--text-muted);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;margin-bottom:4px;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:var(--card);color:var(--text)}
 .nav-item.active{background:var(--blue-dim);color:var(--blue)}
@@ -138,6 +140,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .debt-tab.active-teal{border-color:var(--teal);background:var(--teal-dim);color:var(--teal)}
 .debt-tab.active-orange{border-color:var(--orange);background:var(--orange-dim);color:var(--orange)}
 .debt-panel{display:none}.debt-panel.active{display:block}
+
+.debt-picker-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:14px}
+.debt-picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.debt-picker-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.debt-picker-sub{font-size:12px;color:var(--text-muted);line-height:1.5}
+.debt-picker-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.debt-picker-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .16s}
+.debt-picker-item:hover{border-color:rgba(20,184,166,.45);background:rgba(20,184,166,.08)}
+.debt-picker-item input{width:17px;height:17px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+.debt-picker-person{display:flex;align-items:center;gap:9px;min-width:0;font-weight:700}
+.debt-picker-avatar{width:28px;height:28px;border-radius:8px;background:var(--purple-dim);color:var(--purple);display:grid;place-items:center;font-size:13px;flex-shrink:0}
+.debt-picker-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.debt-picker-amount{color:var(--teal);font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.debt-receipt-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px}
+.debt-receipt-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.receipt-mode-select{width:auto;min-width:190px;background:var(--card2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:9px 34px 9px 12px;font-size:13px;font-weight:600;font-family:inherit;outline:none;cursor:pointer}
+.receipt-mode-select:focus{border-color:var(--teal)}
+.receipt-mode-select option{background:var(--card2);color:var(--text)}
 
 .debt-person-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px}
 .debt-person-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}

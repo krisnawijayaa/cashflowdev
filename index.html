@@ -38,7 +38,7 @@
 <body>
 
 <aside class="sidebar">
-  <div class="logo"><span>💰</span> Cashflow</div>
+  <div class="logo"><img src="icons/icon-512.png" alt="Budget.in"/> Budget.in</div>
   <button class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span> Dashboard</button>
   <button class="nav-item" onclick="showPage('transaksi',this)"><span class="icon">📋</span> Transaksi</button>
   <button class="nav-item" onclick="showPage('tambah',this)"><span class="icon">➕</span> Tambah</button>
@@ -52,7 +52,7 @@
     <button class="nav-item" onclick="openSettings()"><span class="icon">⚙️</span> Pengaturan</button>
     <button class="nav-item" onclick="confirmReset()" style="color:var(--red)"><span class="icon">🗑️</span> Reset Data</button>
   </div>
-  <div class="sidebar-footer">BNI Main Account<br/>Cashflow v3.0</div>
+  <div class="sidebar-footer">BNI Main Account<br/>Budget.in v3.0</div>
 </aside>
 
 <nav class="mobile-nav">
@@ -157,7 +157,7 @@
 
     <!-- Cashflow Forecast -->
     <div class="card">
-      <div class="section-title">📈 Cashflow Forecast</div>
+      <div class="section-title">📈 Budget Forecast</div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div id="cf-status-dot" style="width:12px;height:12px;border-radius:50%;background:var(--text-muted);flex-shrink:0"></div>
         <div style="font-size:14px;font-weight:700" id="cf-status-text">—</div>
@@ -420,12 +420,25 @@
       <div class="card card-accent-green"><div class="card-label">Sudah Dibayar</div><div class="card-value" id="piutang-paid">Rp 0</div><div class="card-sub">total terlunasi</div></div>
       <div class="card card-accent-amber"><div class="card-label">Jumlah Orang</div><div class="card-value" id="piutang-count">0</div><div class="card-sub">orang masih hutang</div></div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <div style="font-size:12px;color:var(--text-muted)">✔️ Centang debitur, lalu klik "Tagih" untuk membuat invoice (hanya berisi transaksi belum lunas).</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <select id="invoice-mode" aria-label="Mode invoice" style="width:auto;min-width:170px;padding:9px 10px">
-          <option value="separate">Invoice per debitur</option>
-          <option value="combined">Satu invoice gabungan</option>
+    <div class="debt-picker-card" id="debtor-picker-card" style="display:none">
+      <div class="debt-picker-head">
+        <div>
+          <div class="section-title" style="margin-bottom:3px">Pilih Debitur</div>
+          <div class="debt-picker-sub">Ceklis orang yang masih ngutang tanpa perlu scroll ke bawah.</div>
+        </div>
+        <div class="debt-picker-buttons">
+          <button class="btn btn-sm btn-teal" onclick="selectAllActiveDebtors()">Pilih Semua</button>
+          <button class="btn btn-sm btn-danger" onclick="clearSelectedDebtors()">Hapus Semua</button>
+        </div>
+      </div>
+      <div class="debt-picker-list" id="debtor-picker-list"></div>
+    </div>
+    <div class="debt-receipt-toolbar">
+      <div style="font-size:12px;color:var(--text-muted)">✔️ Centang debitur, lalu klik "Tagih" untuk membuat debt receipt (hanya berisi transaksi belum lunas).</div>
+      <div class="debt-receipt-actions">
+        <select id="invoice-mode" class="receipt-mode-select" aria-label="Mode receipt">
+          <option value="separate">Receipt per debitur</option>
+          <option value="combined">Satu receipt gabungan</option>
         </select>
         <button class="btn btn-teal" id="btn-tagih-selected" disabled onclick="generateInvoices()">🧾 Tagih Terpilih</button>
       </div>
@@ -827,7 +840,7 @@
 <!-- MODAL INVOICE PIUTANG -->
 <div class="modal-overlay" id="invoice-modal">
   <div class="modal" style="width:680px">
-    <h2>🧾 Preview Invoice</h2>
+    <h2>🧾 Preview Debt Receipt</h2>
     <div id="invoice-nav-bar" style="display:none;align-items:center;justify-content:space-between;margin-bottom:12px">
       <button class="btn btn-sm" style="background:var(--card2);color:var(--text-muted)" onclick="prevInvoice()">← Sebelumnya</button>
       <span style="font-size:12px;color:var(--text-muted)" id="invoice-counter"></span>
@@ -837,7 +850,7 @@
     <div class="modal-actions" style="flex-wrap:wrap">
       <button class="btn btn-danger" onclick="closeInvoiceModal()">Tutup</button>
       <button class="btn btn-teal" onclick="shareCurrentInvoice()">📤 Bagikan</button>
-      <button class="btn btn-green" onclick="downloadCurrentInvoicePDF()">📄 Download PDF</button>
+      <button class="btn btn-green" onclick="downloadCurrentInvoicePDF()">📄 Download Receipt</button>
       <button class="btn btn-primary" id="btn-download-all" style="display:none" onclick="downloadAllInvoicesPDF()">📦 Download Semua PDF</button>
     </div>
   </div>

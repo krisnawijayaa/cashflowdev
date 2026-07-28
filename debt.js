@@ -131,12 +131,64 @@ function renderUtang(){
 // ─── INVOICE PIUTANG — selection state ───────────────────────────────────────
 let selectedDebtors = new Set(); // lowercase-trimmed debtor keys yang dicentang untuk ditagih
 
+function syncDebtorCheckboxes(){
+  document.querySelectorAll('.debtor-select-cb,.debtor-picker-cb').forEach(cb=>{
+    cb.checked = selectedDebtors.has(cb.dataset.key);
+  });
+}
+
 function updateTagihButton(){
   const btn = el('btn-tagih-selected');
   if(!btn) return;
   const count = selectedDebtors.size;
   btn.textContent = count>0 ? `🧾 Tagih Terpilih (${count})` : '🧾 Tagih Terpilih';
   btn.disabled = count===0;
+  syncDebtorCheckboxes();
+}
+
+function selectAllActiveDebtors(){
+  document.querySelectorAll('.debtor-picker-cb').forEach(cb=>{
+    if(!cb.disabled) selectedDebtors.add(cb.dataset.key);
+  });
+  updateTagihButton();
+}
+
+function clearSelectedDebtors(){
+  selectedDebtors.clear();
+  updateTagihButton();
+}
+
+function attachDebtorCheckboxListeners(root){
+  root.querySelectorAll('.debtor-select-cb,.debtor-picker-cb').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const key = cb.dataset.key;
+      if(cb.checked) selectedDebtors.add(key); else selectedDebtors.delete(key);
+      updateTagihButton();
+    });
+  });
+}
+
+function renderDebtorPicker(map, names){
+  const card = el('debtor-picker-card');
+  const list = el('debtor-picker-list');
+  if(!card || !list) return;
+  const active = names
+    .map(n=>({key:n, person:map[n], unpaid:map[n].entries.filter(e=>!e.settled).reduce((s,e)=>s+e.amount,0)}))
+    .filter(item=>item.unpaid>0)
+    .sort((a,b)=>b.unpaid-a.unpaid || a.person.displayName.localeCompare(b.person.displayName));
+
+  card.style.display = active.length ? 'block' : 'none';
+  list.innerHTML = active.map(item=>`
+    <label class="debt-picker-item">
+      <span class="debt-picker-person">
+        <input type="checkbox" class="debtor-picker-cb" data-key="${escHtml(item.key)}" ${selectedDebtors.has(item.key)?'checked':''}/>
+        <span class="debt-picker-avatar">👤</span>
+        <span class="debt-picker-name">${escHtml(item.person.displayName)}</span>
+      </span>
+      <span class="debt-picker-amount">${fmt(item.unpaid)}</span>
+    </label>
+  `).join('');
+  attachDebtorCheckboxListeners(list);
 }
 
 function renderPiutang(){
@@ -161,6 +213,7 @@ function renderPiutang(){
     totalOwed+=u; totalPaid+=pd; if(u>0) activePeople++;
   });
   safe('piutang-total',fmt(totalOwed)); safe('piutang-paid',fmt(totalPaid)); safe('piutang-count',activePeople);
+  renderDebtorPicker(map, names);
 
   const wrap=el('piutang-list'); if(!wrap) return;
   if(!names.length){ wrap.innerHTML=`<div class="empty-state"><div class="emoji">🤝</div><p>Belum ada piutang tercatat.<br>Centang "Ada yang utang ke gua?" saat tambah transaksi.</p></div>`; return; }
@@ -201,13 +254,7 @@ function renderPiutang(){
   }).join('');
 
   // Pasang listener checkbox debitur (di-render ulang tiap renderPiutang, jadi re-attach tiap kali)
-  wrap.querySelectorAll('.debtor-select-cb').forEach(cb=>{
-    cb.addEventListener('change', ()=>{
-      const key = cb.dataset.key;
-      if(cb.checked) selectedDebtors.add(key); else selectedDebtors.delete(key);
-      updateTagihButton();
-    });
-  });
+  attachDebtorCheckboxListeners(wrap);
   updateTagihButton();
 }
 
@@ -273,7 +320,177 @@ let invoiceIndex = 0;
 function buildInvoiceNumber(offset){
   const now = jakartaNow();
   const ymd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-  return `INV/${ymd}/${String(offset+1).padStart(3,'0')}`;
+  return `DBT-${ymd}${String(offset+1).padStart(3,'0')}`;
+}
+
+function receiptOwnerName(){
+  return (settings && (settings.receiptName || settings.ownerName)) || 'Krisna';
+}
+
+function receiptAmount(n){
+  return Math.abs(Math.round(n || 0)).toLocaleString('id-ID');
+}
+
+function receiptDate(dateStr){
+  const d = parseDateStr(dateStr);
+  return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short'}).replace('.', '');
+}
+
+function receiptLongDate(dateStr){
+  const d = parseDateStr(dateStr);
+  return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}).replace('.', '');
+}
+
+function receiptTime(){
+  const now = jakartaNow();
+  return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+function normalizeDebtKey(name){
+  return String(name || '').toLowerCase().trim();
+}
+
+function buildReceiptPeople(selectedKeys){
+  const people = {};
+  const ensure = (key, displayName) => {
+    if(!people[key]) people[key] = {key, displayName, receivable:[], payable:[]};
+    return people[key];
+  };
+
+  transactions.forEach(tx=>{
+    if(tx.split){
+      tx.split.forEach(p=>{
+        const key = normalizeDebtKey(p.name);
+        if(!selectedKeys.has(key) || p.settled) return;
+        ensure(key, p.name).receivable.push({desc:tx.desc, date:tx.date, amount:p.amount});
+      });
+    }
+    if(tx.myDebt){
+      const key = normalizeDebtKey(tx.myDebt.to);
+      if(!selectedKeys.has(key) || tx.myDebt.settled) return;
+      ensure(key, tx.myDebt.to).payable.push({desc:tx.desc, date:tx.date, amount:tx.myDebt.amount});
+    }
+  });
+
+  return Object.values(people)
+    .filter(p=>p.receivable.length || p.payable.length)
+    .sort((a,b)=>a.displayName.localeCompare(b.displayName))
+    .map(p=>{
+      const receivableTotal = p.receivable.reduce((s,e)=>s+e.amount,0);
+      const payableTotal = p.payable.reduce((s,e)=>s+e.amount,0);
+      const net = receivableTotal - payableTotal;
+      return Object.assign(p, {receivableTotal, payableTotal, net});
+    });
+}
+
+function buildDebtReceiptElement(data){
+  const wrap = document.createElement('div');
+  wrap.style.width='380px';
+  wrap.style.maxWidth='100%';
+  wrap.style.padding='22px 18px';
+  wrap.style.background='#FFFFFF';
+  wrap.style.color='#000000';
+  wrap.style.fontFamily="'Courier New', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  wrap.style.boxSizing='border-box';
+  wrap.style.fontSize='13px';
+  wrap.style.lineHeight='1.35';
+
+  const owner = receiptOwnerName();
+  const hr = `<div style="border-top:1px dashed #000;margin:14px 0"></div>`;
+  const strongHr = `<div style="border-top:3px double #000;margin:16px 0"></div>`;
+  const rowStyle = 'display:grid;grid-template-columns:54px minmax(0,1fr) 74px;gap:8px;align-items:start;margin:7px 0';
+  const subtotal = (label, amount) => `
+    <div style="border-top:1px dashed #000;margin:8px 0 6px"></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-weight:700">
+      <span>${label}</span><span style="font-variant-numeric:tabular-nums">${receiptAmount(amount)}</span>
+    </div>`;
+  const entryRows = entries => entries.map(e=>`
+    <div style="${rowStyle}">
+      <span>${receiptDate(e.date)}</span>
+      <span style="word-break:break-word">${escHtml(e.desc)}</span>
+      <span style="text-align:right;font-variant-numeric:tabular-nums">${receiptAmount(e.amount)}</span>
+    </div>`).join('');
+  const emptyRows = `<div style="margin:7px 0">No outstanding transactions</div>`;
+  const sectionTitle = text => `
+    <div style="display:flex;align-items:center;gap:10px;margin:18px 0 14px">
+      <span style="height:0;border-top:3px double #000;flex:1"></span>
+      <span style="font-size:21px;font-weight:900;letter-spacing:0;text-transform:uppercase">${escHtml(text)}</span>
+      <span style="height:0;border-top:3px double #000;flex:1"></span>
+    </div>`;
+  const netLine = p => {
+    const from = p.net >= 0 ? p.displayName : owner;
+    const to = p.net >= 0 ? owner : p.displayName;
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) 82px;gap:10px;align-items:baseline;font-size:20px;font-weight:900">
+      <span style="word-break:break-word">${escHtml(from)} → ${escHtml(to)}</span>
+      <span style="text-align:right;font-variant-numeric:tabular-nums">${receiptAmount(p.net)}</span>
+    </div>`;
+  };
+  const peopleHtml = data.people.map(p=>`
+    ${sectionTitle(p.displayName)}
+    <div style="font-size:16px;font-weight:800;margin-bottom:8px">→ ${escHtml(owner)} (${p.receivable.length})</div>
+    ${p.receivable.length ? entryRows(p.receivable) : emptyRows}
+    ${subtotal('Subtotal', p.receivableTotal)}
+    ${hr}
+    <div style="font-size:16px;font-weight:800;margin-bottom:8px">← ${escHtml(p.displayName)} (${p.payable.length})</div>
+    ${p.payable.length ? entryRows(p.payable) : emptyRows}
+    ${subtotal('Subtotal', p.payableTotal)}
+    ${strongHr}
+    <div style="text-align:center;font-weight:700;margin-bottom:8px">Net Payment</div>
+    ${netLine(p)}
+    ${strongHr}
+  `).join('');
+  const totalRows = data.people.map(netLine).join(`<div style="border-top:1px dashed #000;margin:8px 0"></div>`);
+
+  wrap.innerHTML = `
+    <div style="text-align:center;margin-bottom:10px">
+      <div style="min-height:48px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+        <img src="icons/budgetin-thermal-logo.png" alt="Budget.in" style="width:92px;height:auto;display:block;object-fit:contain"/>
+      </div>
+      <div style="font-family:Inter,Arial,sans-serif;font-size:24px;font-weight:900;letter-spacing:1px;line-height:1;margin-bottom:6px">BUDGET.IN</div>
+      <div style="font-size:16px;font-weight:700">Debt Receipt</div>
+    </div>
+    ${hr}
+    <div style="display:grid;grid-template-columns:82px 10px 1fr;gap:4px;font-size:14px">
+      <span>Receipt</span><span>:</span><span>${escHtml(data.invoiceNo)}</span>
+      <span>Date</span><span>:</span><span>${receiptLongDate(data.date)}</span>
+      <span>Time</span><span>:</span><span>${escHtml(data.time || receiptTime())}</span>
+    </div>
+    ${hr}
+    ${peopleHtml}
+    <div style="text-align:center;font-weight:900;border:1px solid #000;border-radius:4px;padding:7px 8px;margin:18px 54px 12px">TOTAL NET PAYMENT</div>
+    ${hr}
+    <div>${totalRows}</div>
+    ${hr}
+    <div style="text-align:center;margin:18px 0 12px">Generated by Budget.in</div>
+    ${hr}
+    <div style="height:18px"></div>
+  `;
+  return wrap;
+}
+
+function buildDebtReceiptShareText(data){
+  const owner = receiptOwnerName();
+  let t = `DEBT RECEIPT ${data.invoiceNo}\nDate: ${receiptLongDate(data.date)}\nTime: ${data.time || receiptTime()}\n\n`;
+  data.people.forEach(p=>{
+    t += `${p.displayName.toUpperCase()}\n`;
+    t += `-> ${owner} (${p.receivable.length})\n`;
+    p.receivable.forEach(e=>{ t += `${receiptDate(e.date)}  ${e.desc}  ${receiptAmount(e.amount)}\n`; });
+    t += `Subtotal ${receiptAmount(p.receivableTotal)}\n\n`;
+    t += `<- ${p.displayName} (${p.payable.length})\n`;
+    p.payable.forEach(e=>{ t += `${receiptDate(e.date)}  ${e.desc}  ${receiptAmount(e.amount)}\n`; });
+    t += `Subtotal ${receiptAmount(p.payableTotal)}\n\n`;
+    const from = p.net >= 0 ? p.displayName : owner;
+    const to = p.net >= 0 ? owner : p.displayName;
+    t += `Net Payment: ${from} -> ${to} ${receiptAmount(p.net)}\n\n`;
+  });
+  t += `TOTAL NET PAYMENT\n`;
+  data.people.forEach(p=>{
+    const from = p.net >= 0 ? p.displayName : owner;
+    const to = p.net >= 0 ? owner : p.displayName;
+    t += `${from} -> ${to} ${receiptAmount(p.net)}\n`;
+  });
+  t += `\nGenerated by Budget.in`;
+  return t;
 }
 
 // Membuat invoice terpisah per debitur atau satu invoice gabungan, sesuai pilihan pengguna.
@@ -281,44 +498,31 @@ function buildInvoiceNumber(offset){
 function generateInvoices(){
   if(selectedDebtors.size===0){ showToast('⚠️ Pilih minimal satu debitur dulu!'); return; }
 
-  const map={};
-  transactions.forEach(tx=>{
-    if(!tx.split) return;
-    tx.split.forEach(p=>{
-      const key = p.name.toLowerCase().trim();
-      if(!selectedDebtors.has(key)) return;
-      if(p.settled) return; // hanya piutang yang belum lunas
-      if(!map[key]) map[key]={displayName:p.name, entries:[]};
-      map[key].entries.push({desc:tx.desc, date:tx.date, amount:p.amount, debtor:p.name});
-    });
-  });
-
-  const groups=Object.values(map)
-    .filter(v=>v.entries.length>0)
-    .sort((a,b)=>a.displayName.localeCompare(b.displayName));
+  const groups = buildReceiptPeople(selectedDebtors);
   const mode=el('invoice-mode')?.value || 'separate';
   if(mode==='combined'){
-    const entries=groups.flatMap(group=>group.entries);
-    invoiceQueue=entries.length?[{
+    invoiceQueue=groups.length?[{
       invoiceNo: buildInvoiceNumber(0),
       debtor: groups.map(group=>group.displayName).join(', '),
-      entries,
-      total: entries.reduce((s,e)=>s+e.amount,0),
+      people: groups,
+      total: groups.reduce((s,p)=>s+Math.abs(p.net),0),
       date: todayStr(),
+      time: receiptTime(),
       combined: true
     }]:[];
   } else {
     invoiceQueue=groups.map((v,i)=>({
       invoiceNo: buildInvoiceNumber(i),
       debtor: v.displayName,
-      entries: v.entries,
-      total: v.entries.reduce((s,e)=>s+e.amount,0),
+      people: [v],
+      total: Math.abs(v.net),
       date: todayStr(),
+      time: receiptTime(),
       combined: false
     }));
   }
 
-  if(!invoiceQueue.length){ showToast('⚠️ Debitur terpilih tidak punya piutang yang belum lunas.'); return; }
+  if(!invoiceQueue.length){ showToast('⚠️ Debitur terpilih tidak punya piutang/utang yang belum lunas.'); return; }
 
   invoiceIndex = 0;
   el('invoice-modal').classList.add('open');
@@ -337,7 +541,7 @@ function renderInvoicePreview(){
   wrap.innerHTML = '';
   wrap.appendChild(buildInvoiceElement(data));
 
-  safe('invoice-counter', `Invoice ${invoiceIndex+1} dari ${invoiceQueue.length} — ${data.debtor}`);
+  safe('invoice-counter', `Receipt ${invoiceIndex+1} dari ${invoiceQueue.length} — ${data.debtor}`);
   const navBar = el('invoice-nav-bar');
   if(navBar) navBar.style.display = invoiceQueue.length>1 ? 'flex' : 'none';
   const btnAll = el('btn-download-all');
@@ -345,6 +549,7 @@ function renderInvoicePreview(){
 }
 
 function buildInvoiceElement(data){
+  return buildDebtReceiptElement(data);
   const wrap = document.createElement('div');
   wrap.style.width='640px';
   wrap.style.padding='32px';
@@ -407,6 +612,7 @@ function buildInvoiceElement(data){
 }
 
 function buildInvoiceShareText(data){
+  return buildDebtReceiptShareText(data);
   let t = `🧾 INVOICE ${data.invoiceNo}\nKepada: ${data.debtor}\nTanggal: ${data.date}\n\n`;
   data.entries.forEach(e=>{ t += `- ${data.combined ? `${e.debtor} — ` : ''}${e.desc} (${e.date}): ${fmt(e.amount)}\n`; });
   t += `\nTotal Tagihan: ${fmt(data.total)}`;
@@ -417,9 +623,16 @@ async function renderInvoiceCanvas(data){
   const docEl = buildInvoiceElement(data);
   docEl.style.position='fixed'; docEl.style.left='-9999px'; docEl.style.top='0';
   document.body.appendChild(docEl);
+  await Promise.all(Array.from(docEl.querySelectorAll('img')).map(img=>{
+    if(img.complete) return Promise.resolve();
+    return new Promise(resolve=>{
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  }));
   await new Promise(r=>setTimeout(r,30));
   try{
-    return await html2canvas(docEl, {backgroundColor:'#FFFFFF', scale:2, width:640});
+    return await html2canvas(docEl, {backgroundColor:'#FFFFFF', scale:2, width:380});
   } finally {
     docEl.remove();
   }
@@ -431,15 +644,16 @@ async function downloadInvoicePDF(data){
     const canvas = await renderInvoiceCanvas(data);
     const { jsPDF } = window.jspdf;
     const imgData = canvas.toDataURL('image/png');
-    const a4w=210, a4h=297;
-    const pxToMm = a4w/canvas.width;
+    const receiptW=80;
+    const pxToMm = receiptW/canvas.width;
     const imgHmm = canvas.height*pxToMm;
-    const pdf = new jsPDF({orientation:'p', unit:'mm', format:'a4'});
-    if(imgHmm<=a4h){
-      pdf.addImage(imgData,'PNG',0,0,a4w,imgHmm);
+    const pageH = Math.max(120, imgHmm);
+    const pdf = new jsPDF({orientation:'p', unit:'mm', format:[receiptW, pageH]});
+    if(imgHmm<=pageH){
+      pdf.addImage(imgData,'PNG',0,0,receiptW,imgHmm);
     } else {
       // invoice panjang (banyak transaksi belum lunas) → split ke beberapa halaman A4
-      const pageHeightPx = Math.floor(a4h/pxToMm);
+      const pageHeightPx = Math.floor(pageH/pxToMm);
       let rendered=0, first=true;
       while(rendered<canvas.height){
         const sliceH = Math.min(pageHeightPx, canvas.height-rendered);
@@ -449,14 +663,14 @@ async function downloadInvoicePDF(data){
         ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,pc.width,pc.height);
         ctx.drawImage(canvas,0,rendered,canvas.width,sliceH,0,0,canvas.width,sliceH);
         if(!first) pdf.addPage();
-        pdf.addImage(pc.toDataURL('image/png'),'PNG',0,0,a4w,sliceH*pxToMm);
+        pdf.addImage(pc.toDataURL('image/png'),'PNG',0,0,receiptW,sliceH*pxToMm);
         rendered+=sliceH; first=false;
       }
     }
-    pdf.save(`Invoice_${data.debtor.replace(/\s+/g,'_')}_${data.date}.pdf`);
+    pdf.save(`Debt_Receipt_${data.debtor.replace(/\s+/g,'_')}_${data.date}.pdf`);
     return true;
   } catch(err){
-    showToast('❌ Gagal membuat invoice: '+err.message);
+    showToast('❌ Gagal membuat receipt: '+err.message);
     return false;
   }
 }
@@ -465,7 +679,7 @@ async function downloadCurrentInvoicePDF(){
   const data = invoiceQueue[invoiceIndex];
   if(!data) return;
   const ok = await downloadInvoicePDF(data);
-  if(ok) showToast('✅ Invoice PDF didownload!');
+  if(ok) showToast('✅ Receipt PDF didownload!');
 }
 
 async function downloadAllInvoicesPDF(){
@@ -474,7 +688,7 @@ async function downloadAllInvoicesPDF(){
     await downloadInvoicePDF(data);
     await new Promise(r=>setTimeout(r,300)); // beri jeda supaya browser tidak block multi-download
   }
-  showToast(`✅ ${invoiceQueue.length} invoice PDF didownload!`);
+  showToast(`✅ ${invoiceQueue.length} receipt PDF didownload!`);
 }
 
 async function shareCurrentInvoice(){
@@ -488,14 +702,14 @@ async function shareCurrentInvoice(){
         const canvas = await renderInvoiceCanvas(data);
         const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
         if(blob){
-          const file = new File([blob], `Invoice_${data.debtor.replace(/\s+/g,'_')}.png`, {type:'image/png'});
+          const file = new File([blob], `Debt_Receipt_${data.debtor.replace(/\s+/g,'_')}.png`, {type:'image/png'});
           if(navigator.canShare({files:[file]})){
-            await navigator.share({files:[file], title:`Invoice - ${data.debtor}`, text: shareText});
+            await navigator.share({files:[file], title:`Debt Receipt - ${data.debtor}`, text: shareText});
             return;
           }
         }
       }
-      await navigator.share({title:`Invoice - ${data.debtor}`, text: shareText});
+      await navigator.share({title:`Debt Receipt - ${data.debtor}`, text: shareText});
       return;
     } catch(err){
       if(err && err.name==='AbortError') return; // dibatalkan user, jangan fallback
@@ -503,7 +717,7 @@ async function shareCurrentInvoice(){
   }
 
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(shareText).then(()=>showToast('📋 Invoice disalin ke clipboard!'));
+    navigator.clipboard.writeText(shareText).then(()=>showToast('📋 Receipt disalin ke clipboard!'));
   } else {
     showToast('⚠️ Fitur share tidak didukung di browser ini');
   }
