@@ -16,7 +16,7 @@ const HEADERS = {
   settings: ['Key','Value']
 };
 
-const DEFAULT_SETTINGS = {income:0, name:'BNI Main Account', cclimit:5000000};
+const DEFAULT_SETTINGS = {income:0, name:'BNI Main Account', cclimit:5000000, receiptOwnerName:'', receiptBankAccount:'', receiptStoreName:'', receiptNmid:''};
 
 const ASSET_LABEL = {
   cash:'💵 Cash/Tabungan',
@@ -295,7 +295,7 @@ function readSettings(){
     const key = String(row.Key || '').trim();
     if(!key) return;
     const value = row.Value;
-    settings[key] = key === 'income' || key === 'cclimit' ? toNumber(value) : String(value || '');
+    settings[key] = (key === 'income' || key === 'cclimit') ? toNumber(value) : String(value || '');
   });
   return settings;
 }
@@ -305,7 +305,11 @@ function writeSettings(settings){
   writeObjects(getSheet(SHEETS.settings), HEADERS.settings, [
     {Key:'income', Value:toNumber(data.income)},
     {Key:'name', Value:data.name || DEFAULT_SETTINGS.name},
-    {Key:'cclimit', Value:toNumber(data.cclimit) || DEFAULT_SETTINGS.cclimit}
+    {Key:'cclimit', Value:toNumber(data.cclimit) || DEFAULT_SETTINGS.cclimit},
+    {Key:'receiptOwnerName', Value:data.receiptOwnerName || ''},
+    {Key:'receiptBankAccount', Value:data.receiptBankAccount || ''},
+    {Key:'receiptStoreName', Value:data.receiptStoreName || ''},
+    {Key:'receiptNmid', Value:data.receiptNmid || ''}
   ]);
 }
 

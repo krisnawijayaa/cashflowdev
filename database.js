@@ -1,6 +1,6 @@
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let transactions = [];
-let settings = {income:0,name:'BNI Main Account',cclimit:5000000};
+let settings = {income:0,name:'BNI Main Account',cclimit:5000000,receiptOwnerName:'',receiptBankAccount:'',receiptStoreName:'',receiptNmid:''};
 let splitPeople = [];
 let currentFilter = 'all';
 let trendChart = null, pieChart = null;
@@ -24,7 +24,7 @@ function getDatabasePayload(){
 function applyDatabasePayload(data){
   if(!data) return;
   if(Array.isArray(data.transactions)) transactions = data.transactions;
-  if(data.settings) settings = Object.assign({income:0,name:'BNI Main Account',cclimit:5000000}, data.settings);
+  if(data.settings) settings = Object.assign({income:0,name:'BNI Main Account',cclimit:5000000,receiptOwnerName:'',receiptBankAccount:'',receiptStoreName:'',receiptNmid:''}, data.settings);
   if(Array.isArray(data.assets) && typeof assets !== 'undefined') assets = data.assets;
 }
 
@@ -385,6 +385,10 @@ function openSettings(){
   el('set-income').value=settings.income||'';
   el('set-name').value=settings.name||'';
   el('set-cclimit').value=settings.cclimit||'';
+  const ro=el('set-receipt-owner'); if(ro) ro.value=settings.receiptOwnerName||'';
+  const rb=el('set-receipt-bank'); if(rb) rb.value=settings.receiptBankAccount||'';
+  const rs=el('set-receipt-store'); if(rs) rs.value=settings.receiptStoreName||'';
+  const rn=el('set-receipt-nmid'); if(rn) rn.value=settings.receiptNmid||'';
   el('settings-modal').classList.add('open');
 }
 function closeSettings(){ el('settings-modal').classList.remove('open'); }
@@ -392,6 +396,10 @@ function saveSettings(){
   settings.income=parseFloat(el('set-income').value)||0;
   settings.name=el('set-name').value||'BNI Main Account';
   settings.cclimit=parseFloat(el('set-cclimit').value)||5000000;
+  const ro=el('set-receipt-owner'); if(ro) settings.receiptOwnerName=ro.value.trim();
+  const rb=el('set-receipt-bank'); if(rb) settings.receiptBankAccount=rb.value.trim();
+  const rs=el('set-receipt-store'); if(rs) settings.receiptStoreName=rs.value.trim();
+  const rn=el('set-receipt-nmid'); if(rn) settings.receiptNmid=rn.value.trim();
   save();
   closeSettings(); renderDashboard();
   showToast('✅ Pengaturan disimpan!');

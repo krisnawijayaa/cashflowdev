@@ -1,4 +1,4 @@
-﻿*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#060D1F;--surface:#0F172A;--card:#131E35;--card2:#1A2540;--border:#1E2D4A;
   --blue:#3B82F6;--blue-dim:rgba(59,130,246,.12);
@@ -309,3 +309,45 @@ tr:hover td{background:rgba(255,255,255,.02)}
 @media(max-width:900px){.nw-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.nw-grid{grid-template-columns:1fr 1fr}}
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   DEBT SUMMARY (new — Piutang & Utang redesign)
+   ══════════════════════════════════════════════════════════════════════ */
+.debt-summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:1100px){.debt-summary-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.debt-summary-grid{grid-template-columns:repeat(2,1fr)}}
+.ds-stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.ds-stat-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px}
+.ds-stat-value{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+
+.debt-summary-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;justify-content:space-between}
+.debt-summary-search{flex:1;min-width:220px;max-width:360px}
+.debt-summary-search input{width:100%}
+.debt-summary-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.debt-outstanding-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none}
+.debt-outstanding-toggle input{width:14px;height:14px;accent-color:var(--teal);cursor:pointer}
+
+.debt-summary-sections{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.debt-summary-sections{grid-template-columns:1fr}}
+.debt-summary-section h3{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+
+.debt-sum-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.debt-sum-card-head{display:flex;align-items:center;padding:12px 14px;gap:10px}
+.debt-sum-card-head:hover{background:var(--card2)}
+.debt-sum-avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.debt-sum-chevron{font-size:12px;color:var(--text-muted);transition:transform .2s;cursor:pointer;padding:4px}
+.debt-sum-card-body{padding:0 14px 12px}
+.debt-sum-checkbox{width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+
+/* ══════════════════════════════════════════════════════════════════════
+   THERMAL DEBT RECEIPT (new — replaces old boxy invoice look)
+   ══════════════════════════════════════════════════════════════════════ */
+@font-face{font-family:'JetBrains Mono';src:url('assets/fonts/JetBrainsMono-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('assets/fonts/JetBrainsMono-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+
+.thermal-receipt{width:360px;max-width:100%;padding:22px 16px;background:#fff;color:#000;font-family:'JetBrains Mono','Courier New',monospace;box-sizing:border-box;margin:0 auto}
+.thermal-receipt-pre{margin:0;font-size:12.5px;line-height:1.5;white-space:pre;font-family:inherit;letter-spacing:0}
+.thermal-receipt-footer{margin-top:12px;font-size:12.5px;line-height:1.6;font-family:inherit}
+.thermal-receipt .tr-center{text-align:center}
+.thermal-receipt-qris{display:flex;justify-content:center;margin-top:10px}
+.thermal-receipt-qris img{width:190px;height:190px;object-fit:contain}

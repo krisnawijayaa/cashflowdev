@@ -408,6 +408,59 @@
 <div class="page" id="page-utang">
   <div class="topbar"><div><h1>🤝 Piutang & Utang</h1><div class="date-label">Tracking semua hutang piutang</div></div></div>
 
+  <!-- ═══ DEBT SUMMARY (new) ═══ -->
+  <div class="debt-summary-grid">
+    <div class="ds-stat"><div class="ds-stat-label">Total Piutang</div><div class="ds-stat-value" style="color:var(--teal)" id="ds-total-piutang">Rp 0</div></div>
+    <div class="ds-stat"><div class="ds-stat-label">Total Hutang</div><div class="ds-stat-value" style="color:var(--orange)" id="ds-total-hutang">Rp 0</div></div>
+    <div class="ds-stat"><div class="ds-stat-label">Total Outstanding</div><div class="ds-stat-value" style="color:var(--red)" id="ds-total-outstanding">Rp 0</div></div>
+    <div class="ds-stat"><div class="ds-stat-label">Jumlah Debitur</div><div class="ds-stat-value" id="ds-count-debitur">0</div></div>
+    <div class="ds-stat"><div class="ds-stat-label">Jumlah Kreditur</div><div class="ds-stat-value" id="ds-count-kreditur">0</div></div>
+    <div class="ds-stat"><div class="ds-stat-label">Tx Outstanding</div><div class="ds-stat-value" id="ds-count-tx">0</div></div>
+  </div>
+
+  <div class="debt-summary-toolbar">
+    <div class="debt-summary-search">
+      <input type="text" id="ds-search" placeholder="🔍 Cari nama..." oninput="onDebtSearchInput(this)" autocomplete="off"/>
+    </div>
+    <div class="debt-summary-actions">
+      <label class="debt-outstanding-toggle"><input type="checkbox" checked onchange="toggleDebtOutstandingOnly(this)"/> Outstanding saja</label>
+      <button class="btn btn-sm" style="background:var(--card2);color:var(--text-dim)" onclick="expandAllDebtCards()">⬇ Expand All</button>
+      <button class="btn btn-sm" style="background:var(--card2);color:var(--text-dim)" onclick="collapseAllDebtCards()">⬆ Collapse All</button>
+    </div>
+  </div>
+
+  <div class="filter-bar" id="ds-filter-bar">
+    <button class="filter-btn active" onclick="setDebtSummaryFilter('all',this)">Semua</button>
+    <button class="filter-btn" onclick="setDebtSummaryFilter('receivable',this)">🤝 Receivable</button>
+    <button class="filter-btn" onclick="setDebtSummaryFilter('payable',this)">🏧 Payable</button>
+  </div>
+
+  <div class="debt-receipt-toolbar" style="margin-bottom:20px">
+    <div style="font-size:12px;color:var(--text-muted)">✔️ Centang orang (di card di bawah), lalu buat Debt Receipt untuk cross-check sebelum transfer.</div>
+    <div class="debt-receipt-actions">
+      <select id="invoice-mode" class="receipt-mode-select" aria-label="Mode receipt">
+        <option value="separate">Receipt per orang</option>
+        <option value="combined">Satu receipt gabungan</option>
+      </select>
+      <button class="btn btn-sm btn-teal" onclick="selectAllActiveDebtors()">Pilih Semua</button>
+      <button class="btn btn-sm btn-danger" onclick="clearSelectedDebtors()">Hapus Pilihan</button>
+      <button class="btn btn-teal" id="btn-tagih-selected" disabled onclick="generateInvoices()">🧾 Buat Receipt</button>
+    </div>
+  </div>
+
+  <div class="debt-summary-sections">
+    <div class="debt-summary-section" id="ds-receivable-section">
+      <h3 style="color:var(--teal)">🤝 Orang yang Berutang ke Saya (Receivable)</h3>
+      <div id="ds-receivable-list"></div>
+    </div>
+    <div class="debt-summary-section" id="ds-payable-section">
+      <h3 style="color:var(--orange)">🏧 Orang yang Akan Saya Bayar (Payable)</h3>
+      <div id="ds-payable-list"></div>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORI LENGKAP (existing — tidak dihapus) ═══ -->
+  <div class="section-title" style="margin-bottom:14px">📜 Histori Lengkap</div>
   <div class="debt-tabs">
     <button class="debt-tab active-teal" id="tab-piutang" onclick="switchDebtTab('piutang')">🤝 Piutang (orang utang ke gua)</button>
     <button class="debt-tab" id="tab-mydebt" onclick="switchDebtTab('mydebt')">🏧 Utang Gua (gua utang ke orang)</button>
@@ -419,29 +472,6 @@
       <div class="card card-accent-teal"><div class="card-label">Total Piutang</div><div class="card-value" id="piutang-total">Rp 0</div><div class="card-sub">belum lunas</div></div>
       <div class="card card-accent-green"><div class="card-label">Sudah Dibayar</div><div class="card-value" id="piutang-paid">Rp 0</div><div class="card-sub">total terlunasi</div></div>
       <div class="card card-accent-amber"><div class="card-label">Jumlah Orang</div><div class="card-value" id="piutang-count">0</div><div class="card-sub">orang masih hutang</div></div>
-    </div>
-    <div class="debt-picker-card" id="debtor-picker-card" style="display:none">
-      <div class="debt-picker-head">
-        <div>
-          <div class="section-title" style="margin-bottom:3px">Pilih Debitur</div>
-          <div class="debt-picker-sub">Ceklis orang yang masih ngutang tanpa perlu scroll ke bawah.</div>
-        </div>
-        <div class="debt-picker-buttons">
-          <button class="btn btn-sm btn-teal" onclick="selectAllActiveDebtors()">Pilih Semua</button>
-          <button class="btn btn-sm btn-danger" onclick="clearSelectedDebtors()">Hapus Semua</button>
-        </div>
-      </div>
-      <div class="debt-picker-list" id="debtor-picker-list"></div>
-    </div>
-    <div class="debt-receipt-toolbar">
-      <div style="font-size:12px;color:var(--text-muted)">✔️ Centang debitur, lalu klik "Tagih" untuk membuat debt receipt (hanya berisi transaksi belum lunas).</div>
-      <div class="debt-receipt-actions">
-        <select id="invoice-mode" class="receipt-mode-select" aria-label="Mode receipt">
-          <option value="separate">Receipt per debitur</option>
-          <option value="combined">Satu receipt gabungan</option>
-        </select>
-        <button class="btn btn-teal" id="btn-tagih-selected" disabled onclick="generateInvoices()">🧾 Tagih Terpilih</button>
-      </div>
     </div>
     <div id="piutang-list"></div>
   </div>
@@ -687,6 +717,13 @@
     <div class="form-group" style="margin-bottom:14px"><label>Income Bulanan (Rp)</label><input type="number" id="set-income" placeholder="contoh: 10000000"/></div>
     <div class="form-group" style="margin-bottom:14px"><label>Nama Akun</label><input type="text" id="set-name" placeholder="BNI Main Account"/></div>
     <div class="form-group" style="margin-bottom:14px"><label>Limit CC (Rp)</label><input type="number" id="set-cclimit" placeholder="contoh: 5000000"/></div>
+    <div class="divider"></div>
+    <div class="section-title" style="margin-bottom:12px">🧾 Info Debt Receipt</div>
+    <div class="form-group" style="margin-bottom:14px"><label>Nama Pemilik (untuk header receipt)</label><input type="text" id="set-receipt-owner" placeholder="Krisna Chandra Wijaya"/></div>
+    <div class="form-group" style="margin-bottom:14px"><label>Rekening (bank + nomor)</label><input type="text" id="set-receipt-bank" placeholder="BNI 0685851474"/></div>
+    <div class="form-group" style="margin-bottom:14px"><label>Nama Toko (footer receipt)</label><input type="text" id="set-receipt-store" placeholder="KCW Store, Toko Pakaian"/></div>
+    <div class="form-group" style="margin-bottom:4px"><label>NMID</label><input type="text" id="set-receipt-nmid" placeholder="ID1026559727460"/></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">QRIS diambil otomatis dari <code style="background:var(--card2);padding:1px 5px;border-radius:4px">assets/icons/qris.png</code>. Kalau file belum ada, bagian QRIS di receipt otomatis disembunyikan.</div>
     <div class="modal-actions">
       <button class="btn btn-danger" onclick="closeSettings()">Batal</button>
       <button class="btn btn-primary" onclick="saveSettings()">💾 Simpan</button>
@@ -849,8 +886,10 @@
     <div id="invoice-preview-wrap" style="background:#fff;border-radius:10px;overflow:auto;max-height:60vh"></div>
     <div class="modal-actions" style="flex-wrap:wrap">
       <button class="btn btn-danger" onclick="closeInvoiceModal()">Tutup</button>
-      <button class="btn btn-teal" onclick="shareCurrentInvoice()">📤 Bagikan</button>
-      <button class="btn btn-green" onclick="downloadCurrentInvoicePDF()">📄 Download Receipt</button>
+      <button class="btn" style="background:var(--card2);color:var(--text-dim)" onclick="printCurrentReceipt()">🖨️ Print</button>
+      <button class="btn btn-teal" onclick="shareCurrentInvoice()">📤 Bagikan WA</button>
+      <button class="btn btn-amber" onclick="downloadCurrentReceiptPNG()">🖼️ PNG</button>
+      <button class="btn btn-green" onclick="downloadCurrentInvoicePDF()">📄 PDF</button>
       <button class="btn btn-primary" id="btn-download-all" style="display:none" onclick="downloadAllInvoicesPDF()">📦 Download Semua PDF</button>
     </div>
   </div>
@@ -860,6 +899,8 @@
 
 <script src="database.js"></script>
 <script src="debt.js"></script>
+<script src="debt-summary.js"></script>
+<script src="debt-receipt.js"></script>
 <script src="charts.js"></script>
 <script src="assets.js"></script>
 <script src="app.js"></script>
